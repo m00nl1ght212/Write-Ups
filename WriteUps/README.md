@@ -2,8 +2,6 @@
 
 # 🔐 Writeups — HTB · THM · Vulnyx
 
-*Personal collection of solved cybersecurity machines and challenges*
-
 <img src="https://cdn.simpleicons.org/hackthebox" alt="Hack The Box" height="40"/> <img src="https://cdn.simpleicons.org/tryhackme" alt="TryHackMe" height="40"/> <img src="img/vulnyx-logo.png" alt="Vulnyx" height="40"/>
 
 </div>
