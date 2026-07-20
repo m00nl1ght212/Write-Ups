@@ -2,7 +2,7 @@
 
 # 🔐 Writeups — HTB · THM · Vulnyx
 
-<img src="https://cdn.simpleicons.org/hackthebox" alt="Hack The Box" height="40"/> <img src="https://cdn.simpleicons.org/tryhackme" alt="TryHackMe" height="40"/> <img src="img/vulnyx-logo.png" alt="Vulnyx" height="40"/>
+<img src="https://cdn.simpleicons.org/hackthebox" alt="Hack The Box" height="40"/> <img src="https://cdn.simpleicons.org/tryhackme" alt="TryHackMe" height="40"/> <img src="https://media.licdn.com/dms/image/v2/D4D0BAQFEVjY4ipk-iw/company-logo_200_200/company-logo_200_200/0/1694801295770/vulnyx_official_logo" alt="Vulnyx" height="40"/>
 
 </div>
 
