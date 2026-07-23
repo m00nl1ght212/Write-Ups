@@ -7,11 +7,14 @@
 | **Difficulty** | Easy |
 | **Creator** | `Soraya` |
 | **Tools used** | `nmap` · `gobuster` · `hydra` · `git` · `ssh` · `nc` |
+| **Tags** | `#InfoDisclosure` `#HardcodedCreds` `#GitHistory` `#CronAbuse` |
 | **URL** | https://vulnyx.com/machines/ |
 
 A set of hardcoded credentials, left in the web app's front-end source code, gives SSH access as `developer`. From there, a private key recovered from the Git history leads to `sysadmin`. The last piece is a maintenance script that runs with elevated privileges but can be edited by `sysadmin` — writing a reverse shell into it is enough to reach root.
 
 ## Enumeration
+
+### Port Scanning
 
 A full TCP port scan is run first:
 
@@ -46,7 +49,7 @@ The main page:
 ```
 http://alpine.nyx
 ```
-<img src="Images/alpine/Pasted image 20260715165456.png"/>
+<img src="../Images/alpine/Pasted image 20260715165456.png"/>
 
 A directory scan is run next, to catch pages that aren't linked from the front page:
 
@@ -73,14 +76,14 @@ Finished
 ```
 http://alpine.nyx/login.html
 ```
-<img src="Images/alpine/Pasted image 20260715165602.png"/>
+<img src="../Images/alpine/Pasted image 20260715165602.png"/>
 
 The rendered page gives nothing away, so the source is checked next:
 
 ```
 view-source:http://alpine.nyx/login.html
 ```
-<img src="Images/alpine/Pasted image 20260715165718.png"/>
+<img src="../Images/alpine/Pasted image 20260715165718.png"/>
 
 A set of credentials sits hardcoded in the markup:
 
@@ -93,15 +96,13 @@ This is a client-side information disclosure. Anything embedded in HTML or JavaS
 ```
 http://alpine.nyx/profile.html
 ```
-<img src="Images/alpine/Pasted image 20260715165900.png"/>
+<img src="../Images/alpine/Pasted image 20260715165900.png"/>
 
 The same pattern shows up again: a second set of credentials, also exposed in the front-end.
 
 > **Credentials found:** `developer:SummerVibes2024!`
 
 ## Initial Access
-
-### Shell as developer
 
 Both credential pairs are worth testing against SSH, the only other exposed service. `hydra` handles the validation:
 
@@ -133,6 +134,8 @@ developer@alpine:~$ cat /home/developer/user.txt
 30a0cf321ff0c0997f45a7202490b260
 ```
 > **User flag:** `30a0cf321ff0c0997f45a7202490b260`
+
+## Lateral Movement
 
 ### Shell as sysadmin
 

