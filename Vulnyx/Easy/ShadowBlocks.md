@@ -251,7 +251,12 @@ An NFS service (port 2049) is listening, but only on `127.0.0.1` — reachable f
 ssh -L 2049:127.0.0.1:2049 lenam@shadowblocks.nyx
 ```
 
-*(Missing step here: the forwarded export still needs to be mounted locally, e.g. `sudo mount -t nfs -o vers=3 127.0.0.1:/srv/nfs ~/Vulnyx/Easy/nfs`, before the commands below make sense — worth adding once confirmed.)*
+In a separate terminal, with the tunnel open, the forwarded export is mounted locally — as root on the attacker machine, since it's the attacker's root UID that needs to reach the server through the tunnel:
+
+```bash
+mkdir -p ~/Vulnyx/Easy/nfs
+sudo mount -t nfs -o vers=4 127.0.0.1:/ ~/Vulnyx/Easy/nfs
+```
 
 If the NFS export is configured with `no_root_squash`, the server trusts the UID a client presents — including root. Mounting it locally as root and creating a SUID-root binary there means that binary keeps root ownership and its SUID bit when the *target* box later accesses the same underlying storage:
 
