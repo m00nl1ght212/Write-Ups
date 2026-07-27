@@ -8,7 +8,7 @@
 ![THM](https://img.shields.io/badge/TRYHACKME-FF3E3E?style=for-the-badge&logo=tryhackme&logoColor=white&labelColor=0F380F)
 ![Vulnyx](https://img.shields.io/badge/VULNYX-9BBC0F?style=for-the-badge&logo=linux&logoColor=black&labelColor=0F380F)
 
-![Machines](https://img.shields.io/badge/Machines%20Cleared-11-9BBC0F?style=flat-square&labelColor=0F380F)
+![Machines](https://img.shields.io/badge/Machines%20Cleared-16-9BBC0F?style=flat-square&labelColor=0F380F)
 ![Status](https://img.shields.io/badge/Status-Leveling%20Up-8BAC0F?style=flat-square&labelColor=0F380F)
 ![License](https://img.shields.io/badge/License-MIT-8B8B8B?style=flat-square&labelColor=0F380F)
 
@@ -79,6 +79,11 @@ Each writeup covers:
 
 | Machine | OS | Difficulty | Writeup |
 |---|:---:|:---:|:---:|
+| Admin | 💻 Windows | 🔵 Low | [▶ Play](./Vulnyx/Low/Admin.md) |
+| Doctor | 🐧 Linux | 🔵 Low | [▶ Play](./Vulnyx/Low/Doctor.md) |
+| Eternal | 💻 Windows | 🔵 Low | [▶ Play](./Vulnyx/Low/Eternal.md) |
+| Experience | 💻 Windows | 🔵 Low | [▶ Play](./Vulnyx/Low/Experience.md) |
+| Fing | 🐧 Linux | 🔵 Low | [▶ Play](./Vulnyx/Low/Fing.md) |
 | Alpine | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Alpine.md) |
 | Bank | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Bank.md) |
 | Brain | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Brain.md) |
