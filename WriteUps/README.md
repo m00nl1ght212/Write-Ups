@@ -1,100 +1,121 @@
 <div align="center">
 
-# 🔐 Writeups — HTB · THM · Vulnyx
+<img src="https://readme-typing-svg.demolab.com?font=Press+Start+2P&size=20&duration=3000&pause=1000&color=9BBC0F&center=true&vCenter=true&width=600&height=60&lines=WRITEUPS;HTB+%C2%B7+THM+%C2%B7+VULNYX" alt="Typing SVG" />
 
-*Personal collection of solved cybersecurity machines and challenges*
+<br>
 
-<img src="img/htb_logo.jpg" alt="Hack The Box" height="40"/> <img src="img/thm_logo.png" alt="TryHackMe" height="40"/> <img src="img/vulnyx_logo.png" alt="Vulnyx" height="40"/>
+![HTB](https://img.shields.io/badge/HACK%20THE%20BOX-9FEF00?style=for-the-badge&logo=hackthebox&logoColor=black&labelColor=0F380F)
+![THM](https://img.shields.io/badge/TRYHACKME-FF3E3E?style=for-the-badge&logo=tryhackme&logoColor=white&labelColor=0F380F)
+![Vulnyx](https://img.shields.io/badge/VULNYX-9BBC0F?style=for-the-badge&logo=linux&logoColor=black&labelColor=0F380F)
+
+![Machines](https://img.shields.io/badge/Machines%20Cleared-11-9BBC0F?style=flat-square&labelColor=0F380F)
+![Status](https://img.shields.io/badge/Status-Leveling%20Up-8BAC0F?style=flat-square&labelColor=0F380F)
+![License](https://img.shields.io/badge/License-MIT-8B8B8B?style=flat-square&labelColor=0F380F)
 
 </div>
 
----
+<br>
 
-## 📖 About this repository
+## 🕹️ About
 
-This repository gathers **writeups** for machines and challenges solved on **Hack The Box**, **TryHackMe**, and **Vulnyx**, documenting the full process of reconnaissance, exploitation, and privilege escalation for each one.
+Welcome to my writeup log — a growing collection of solved machines and challenges from **Hack The Box**, **TryHackMe**, and **Vulnyx**.
 
-The goal is to keep a personal learning log and, along the way, help anyone getting started in pentesting by showing real examples of applied methodology.
+Each entry documents the full run: recon → exploitation → privilege escalation → flags.
 
-> ⚠️ **Note:** writeups for active HTB machines are published only once they're retired, in line with the platform's rules.
+> ⚠️ Writeups for active HTB machines are published only after they're retired.
 
----
+<br>
 
-## 🗂️ Repository structure
+## 🗺️ Structure
 
 ```
 writeups/
-├── README.md
-├── htb/
-│   └── <machine-name>/
-│       ├── README.md
-│       └── img/
-├── thm/
-│   └── <room-name>/
-│       ├── README.md
-│       └── img/
-└── vulnyx/
-    └── <machine-name>/
-        ├── README.md
-        └── img/
+├── HTB/
+│   ├── Easy/
+│   ├── Medium/
+│   ├── Hard/       
+│   └── Insane/
+├── THM/
+│   ├── Info/
+│   ├── Easy/
+│   ├── Medium/
+│   ├── Hard/        
+│   └── Insane/
+├── Vulnyx/
+│   ├── Low/
+│   ├── Easy/
+│   ├── Medium/       
+│   └── Hard/
+└── README.md
 ```
 
-Each writeup includes:
+Each writeup covers:
 
-- 🔍 **Reconnaissance** (port scanning, service enumeration)
-- 🚪 **Exploitation** (entry vector, foothold)
-- 🔓 **Privilege escalation**
-- 🏁 **Flags** (user & root/system)
-- 🛠️ **Tools used**
+| Stage | Description |
+|---|---|
+| 🔍 Recon | Port scanning, service enumeration |
+| 🚪 Exploitation | Entry vector, initial foothold |
+| 🔓 Privesc | Privilege escalation |
+| 🏁 Flags | User & root/system |
+| 🛠️ Tools | What was used to get there |
 
----
+<br>
 
-## 📋 Machine index
+## 🏆 Machine index
 
-### 🟩 Hack The Box
+### Hack The Box
 
 | Machine | OS | Difficulty | Writeup |
-|---|---|---|---|
-| — | — | — | — |
+|---|:---:|:---:|:---:|
+| Example | 🐧 Linux | 🟢 Easy | [View](./HTB/Linux/example.md) |
 
-### 🟦 TryHackMe
+### TryHackMe
 
 | Room | Category | Difficulty | Writeup |
-|---|---|---|---|
-| — | — | — | — |
+|---|:---:|:---:|:---:|
+| Example | 🌐 Web | 🟢 Easy | [View](./THM/Rooms/example.md) |
 
-### 🟨 Vulnyx
+### Vulnyx
 
-| Machine | Difficulty | Writeup |
-|---|---|---|
-| — | — | — |
+| Machine | OS | Difficulty | Writeup |
+|---|:---:|:---:|:---:|
+| Alpine | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Alpine.md) |
+| Bank | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Bank.md) |
+| Brain | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Brain.md) |
+| Care | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Care.md) |
+| Explorer | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Explorer.md) |
+| Goetia | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Goetia.md) |
+| Northwing | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Northwing.md) |
+| Open | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Open.md) |
+| Serve | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Serve.md) |
+| ShadowBlocks | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/ShadowBlocks.md) |
+| War | 💻 Windows | 🟢 Easy | [▶ Play](./Vulnyx/Easy/War.md) |
 
----
+
+<br>
 
 ## 🧰 Common tools
 
-`nmap` · `gobuster`/`ffuf` · `burpsuite` · `linpeas`/`winpeas` · `impacket` · `hashcat` · `metasploit` · `bloodhound`
+`nmap` `gobuster` `feroxbuster` `burpsuite` `linpeas` `winpeas` `impacket` `hashcat` `metasploit` `bloodhound`
 
----
+<br>
 
-## 🎯 General methodology
+## 📜 Methodology
 
-1. **Passive and active recon** — discovering ports, services, and versions.
-2. **Enumeration** — identifying attack vectors (web, SMB, FTP, etc.).
-3. **Exploitation** — gaining initial access.
-4. **Post-exploitation** — privilege escalation and persistence where applicable.
-5. **Documentation** — capturing commands, screenshots, and key takeaways.
+1. **Recon** — discover ports, services, and versions
+2. **Enumeration** — identify the attack surface
+3. **Exploitation** — gain initial access
+4. **Privilege escalation** — go from user to root
+5. **Documentation** — log commands, screenshots, and lessons learned
 
----
+<br>
 
 ## ⚖️ Disclaimer
 
-All content in this repository is for **educational purposes only**. The techniques shown here should only be applied in controlled, authorized environments (HTB, THM, Vulnyx labs, or others with explicit permission). I am not responsible for any misuse of this information.
-
----
+All content here is for **educational purposes only**. Techniques shown should only be used in controlled, authorized environments (HTB, THM, Vulnyx labs, or with explicit permission). I take no responsibility for misuse of this content.
 
 <div align="center">
 
-⭐ If you find this repository useful, consider giving it a star!
+⭐ If this repo is useful to you, consider giving it a star
 
 </div>
