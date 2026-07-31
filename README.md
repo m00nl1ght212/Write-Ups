@@ -67,31 +67,40 @@ Each writeup covers:
 
 | Machine | OS | Difficulty | Writeup |
 |---|:---:|:---:|:---:|
-| Example | 🐧 Linux | 🟢 Easy | [View](./HTB/Linux/example.md) |
+| Example | 🐧 Linux | 🟢 Easy | [▶ Play](./HTB/Linux/example.md) |
 
 ### TryHackMe
 
 | Room | Category | Difficulty | Writeup |
 |---|:---:|:---:|:---:|
-| Example | 🌐 Web | 🟢 Easy | [View](./THM/Rooms/example.md) |
+| Example | 🌐 Web | 🟢 Easy | [▶ Play](./THM/Rooms/example.md) |
 
 ### Vulnyx
 
 | Machine | OS | Difficulty | Writeup |
 |---|:---:|:---:|:---:|
-| Admin | 💻 Windows | 🔵 Low | [▶ Play](./Vulnyx/Low/Admin.md) |
 | Doctor | 🐧 Linux | 🔵 Low | [▶ Play](./Vulnyx/Low/Doctor.md) |
 | Eternal | 💻 Windows | 🔵 Low | [▶ Play](./Vulnyx/Low/Eternal.md) |
 | Experience | 💻 Windows | 🔵 Low | [▶ Play](./Vulnyx/Low/Experience.md) |
 | Fing | 🐧 Linux | 🔵 Low | [▶ Play](./Vulnyx/Low/Fing.md) |
+| Network | 🐧 Linux | 🔵 Low | [▶ Play](./Vulnyx/Low/Network.md) |
+| Real | 🐧 Linux | 🔵 Low | [▶ Play](./Vulnyx/Low/Real.md) |
+| Admin | 💻 Windows | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Admin.md) |
 | Alpine | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Alpine.md) |
+| Automation | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Automation.md) |
 | Bank | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Bank.md) |
 | Brain | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Brain.md) |
 | Care | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Care.md) |
 | Explorer | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Explorer.md) |
 | Goetia | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Goetia.md) |
+| Hidden | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Hidden.md) |
+| Lookup | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Lookup.md) |
+| Memory | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Memory.md) |
 | Northwing | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Northwing.md) |
 | Open | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Open.md) |
+| Serve | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Serve.md) |
+| Policy | 💻 Windows | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Policy.md) |
+| Printer | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Printer.md) |
 | Serve | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Serve.md) |
 | ShadowBlocks | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/ShadowBlocks.md) |
 | War | 💻 Windows | 🟢 Easy | [▶ Play](./Vulnyx/Easy/War.md) |

@@ -4,7 +4,7 @@
 |---|---|
 | **Platform** | Vulnyx |
 | **OS** | Windows |
-| **Difficulty** | Low |
+| **Difficulty** | Easy |
 | **Creator** | `d4t4s3c` |
 | **Tools used** | `nmap` · `nxc` · `ffuf` · `evil-winrm` · `winPEAS` |
 | **Tags** | `#InfoDisclosure` `#PasswordSpraying` `#WinRM` `#CredentialLeak` `#PSReadLine` |
