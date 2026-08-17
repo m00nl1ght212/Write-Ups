@@ -106,7 +106,7 @@ Each writeup covers:
 | Serve | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Serve.md) |
 | Policy | 💻 Windows | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Policy.md) |
 | Printer | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Printer.md) |
-| Sales | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Alpine.md) |
+| Sales | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Sales.md) |
 | Serve | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Serve.md) |
 | ShadowBlocks | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/ShadowBlocks.md) |
 | War | 💻 Windows | 🟢 Easy | [▶ Play](./Vulnyx/Easy/War.md) |
