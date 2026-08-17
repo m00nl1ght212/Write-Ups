@@ -8,7 +8,7 @@
 ![THM](https://img.shields.io/badge/TRYHACKME-FF3E3E?style=for-the-badge&logo=tryhackme&logoColor=white&labelColor=0F380F)
 ![Vulnyx](https://img.shields.io/badge/VULNYX-9BBC0F?style=for-the-badge&logo=linux&logoColor=black&labelColor=0F380F)
 
-![Machines](https://img.shields.io/badge/Machines%20Cleared-16-9BBC0F?style=flat-square&labelColor=0F380F)
+![Machines](https://img.shields.io/badge/Machines%20Cleared-31-9BBC0F?style=flat-square&labelColor=0F380F)
 ![Status](https://img.shields.io/badge/Status-Leveling%20Up-8BAC0F?style=flat-square&labelColor=0F380F)
 ![License](https://img.shields.io/badge/License-MIT-8B8B8B?style=flat-square&labelColor=0F380F)
 
@@ -87,20 +87,26 @@ Each writeup covers:
 | Real | 🐧 Linux | 🔵 Low | [▶ Play](./Vulnyx/Low/Real.md) |
 | Admin | 💻 Windows | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Admin.md) |
 | Alpine | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Alpine.md) |
+| APex | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/APex.md) |
 | Automation | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Automation.md) |
 | Bank | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Bank.md) |
 | Brain | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Brain.md) |
 | Care | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Care.md) |
+| Carlam | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Carlam.md) |
 | Explorer | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Explorer.md) |
 | Goetia | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Goetia.md) |
 | Hidden | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Hidden.md) |
+| Hit | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Hit.md) |
 | Lookup | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Lookup.md) |
 | Memory | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Memory.md) |
 | Northwing | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Northwing.md) |
+| Ober | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Ober.md) |
+| Observer | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Observer.md) |
 | Open | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Open.md) |
 | Serve | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Serve.md) |
 | Policy | 💻 Windows | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Policy.md) |
 | Printer | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Printer.md) |
+| Sales | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Alpine.md) |
 | Serve | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Serve.md) |
 | ShadowBlocks | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/ShadowBlocks.md) |
 | War | 💻 Windows | 🟢 Easy | [▶ Play](./Vulnyx/Easy/War.md) |
