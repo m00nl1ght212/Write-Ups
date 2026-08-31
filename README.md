@@ -8,7 +8,7 @@
 ![THM](https://img.shields.io/badge/TRYHACKME-FF3E3E?style=for-the-badge&logo=tryhackme&logoColor=white&labelColor=0F380F)
 ![Vulnyx](https://img.shields.io/badge/VULNYX-9BBC0F?style=for-the-badge&logo=linux&logoColor=black&labelColor=0F380F)
 
-![Machines](https://img.shields.io/badge/Machines%20Cleared-31-9BBC0F?style=flat-square&labelColor=0F380F)
+![Machines](https://img.shields.io/badge/Machines%20Cleared-58-9BBC0F?style=flat-square&labelColor=0F380F)
 ![Status](https://img.shields.io/badge/Status-Leveling%20Up-8BAC0F?style=flat-square&labelColor=0F380F)
 ![License](https://img.shields.io/badge/License-MIT-8B8B8B?style=flat-square&labelColor=0F380F)
 
@@ -79,38 +79,65 @@ Each writeup covers:
 
 | Machine | OS | Difficulty | Writeup |
 |---|:---:|:---:|:---:|
+| Diff3r3ntS3c | 🐧 Linux | 🔵 Low | [▶ Play](./Vulnyx/Low/Diff3r3ntS3c.md) |
 | Doctor | 🐧 Linux | 🔵 Low | [▶ Play](./Vulnyx/Low/Doctor.md) |
 | Eternal | 💻 Windows | 🔵 Low | [▶ Play](./Vulnyx/Low/Eternal.md) |
 | Experience | 💻 Windows | 🔵 Low | [▶ Play](./Vulnyx/Low/Experience.md) |
 | Fing | 🐧 Linux | 🔵 Low | [▶ Play](./Vulnyx/Low/Fing.md) |
 | Network | 🐧 Linux | 🔵 Low | [▶ Play](./Vulnyx/Low/Network.md) |
 | Real | 🐧 Linux | 🔵 Low | [▶ Play](./Vulnyx/Low/Real.md) |
+| Absolute | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Absolute.md) |
 | Admin | 💻 Windows | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Admin.md) |
 | Alpine | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Alpine.md) |
 | APex | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/APex.md) |
+| Arpon | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Arpon.md) |
 | Automation | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Automation.md) |
 | Bank | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Bank.md) |
 | Brain | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Brain.md) |
+| Call | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Call.md) |
 | Care | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Care.md) |
 | Carlam | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Carlam.md) |
 | Explorer | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Explorer.md) |
+| Fire | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Fire.md) |
 | Goetia | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Goetia.md) |
 | Hidden | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Hidden.md) |
 | Hit | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Hit.md) |
+| Hook | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Hook.md) |
+| Hosting | 💻 Windows | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Hosting.md) |
+| Load | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Load.md) |
 | Lookup | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Lookup.md) |
+| MailForge | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/MailForge.md) |
 | Memory | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Memory.md) |
+| Method | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Method.md) |
+| Misstep | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Misstep.md) |
 | Northwing | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Northwing.md) |
 | Ober | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Ober.md) |
 | Observer | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Observer.md) |
 | Open | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Open.md) |
-| Serve | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Serve.md) |
+| Play | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Play.md) |
+| Plex | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Plex.md) |
 | Policy | 💻 Windows | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Policy.md) |
 | Printer | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Printer.md) |
+| Remote | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Remote.md) |
 | Sales | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Sales.md) |
+| Send | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Send.md) |
 | Serve | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Serve.md) |
 | ShadowBlocks | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/ShadowBlocks.md) |
-| War | 💻 Windows | 🟢 Easy | [▶ Play](./Vulnyx/Easy/War.md) |
-
+| SRV | 💻 Windows | 🟢 Easy | [▶ Play](./Vulnyx/Easy/SRV.md) |
+| Sun | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/SRV.md) |
+| War | 💻 Windows | 🟢 Easy | [▶ Play](./Vulnyx/Easy/Sun.md) |
+| YourWAF | 🐧 Linux | 🟢 Easy | [▶ Play](./Vulnyx/Easy/YourWAF.md) |
+| Coliseum | 🐧 Linux | 🟠 Medium | [▶ Play](./Vulnyx/Easy/Coliseum.md) |
+| Hat | 🐧 Linux | 🟠 Medium | [▶ Play](./Vulnyx/Easy/Hat.md) |
+| Jenk | 🐧 Linux | 🟠 Medium | [▶ Play](./Vulnyx/Easy/Jenk.md) |
+| Kyubi | 🐧 Linux | 🟠 Medium | [▶ Play](./Vulnyx/Easy/Kyubi.md) |
+| Reset | 🐧 Linux | 🟠 Medium | [▶ Play](./Vulnyx/Easy/Reset.md) |
+| Responder | 🐧 Linux | 🟠 Medium | [▶ Play](./Vulnyx/Easy/Responder.md) |
+| Safeguard | 🐧 Linux | 🟠 Medium | [▶ Play](./Vulnyx/Easy/Safeguard.md) |
+| Secrets | 🐧 Linux | 🟠 Medium | [▶ Play](./Vulnyx/Easy/Secrets.md) |
+| System | 🐧 Linux | 🟠 Medium | [▶ Play](./Vulnyx/Easy/System.md) |
+| Tech | 🐧 Linux | 🟠 Medium | [▶ Play](./Vulnyx/Easy/Tech.md) |
+| Tom | 🐧 Linux | 🟠 Medium | [▶ Play](./Vulnyx/Easy/Tom.md) |
 
 <br>
 

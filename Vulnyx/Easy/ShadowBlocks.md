@@ -208,7 +208,6 @@ Hydra (https://github.com/vanhauser-thc/thc-hydra) starting at 2026-06-30 11:41:
 [DATA] attacking ssh://shadowblocks.nyx:22/
 [22][ssh] host: shadowblocks.nyx   login: lenam   password: 3vEbN3bM6NhOa1640weG
 1 of 1 target successfully completed, 1 valid password found
-Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2026-06-30 11:41:25
 ```
 
 They check out, and a connection follows:

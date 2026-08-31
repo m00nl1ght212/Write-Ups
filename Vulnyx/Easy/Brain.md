@@ -128,7 +128,6 @@ $ hydra -l 'ben' -p 'B3nP4zz' ssh://brain.nyx
 [DATA] attacking ssh://brain.nyx:22
 [22][ssh] host: brain.nyx   login: ben   password: B3nP4zz
 1 of 1 test successfully completed, 1 valid password found
-Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2026-05-17 17:59:05
 ```
 
 They check out, and a connection follows:

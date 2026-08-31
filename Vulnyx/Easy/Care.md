@@ -294,7 +294,6 @@ $ hydra -l 'root' -p 'r00tB0$$123!' ssh://care.nyx
 [DATA] attacking ssh://care.nyx:22
 [22][ssh] host: care.nyx   login: root   password: r00tB0$$123!
 1 of 1 test successfully completed, 1 valid password found
-Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2026-07-17 10:27:13
 ```
 
 They check out, and root is reached directly:

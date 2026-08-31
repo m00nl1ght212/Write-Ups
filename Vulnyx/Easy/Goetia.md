@@ -226,7 +226,6 @@ uce the tasks: use -t 4
 [DATA] attacking ssh://goetia.nyx:22
 [22][ssh] host: goetia.nyx   login: ebathory   password: C43r1m0n14S4nguil3ntu
 1 of 1 test successfully completed, 1 valid password found
-Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2026-07-14 15:01:38
 ```
 
 They check out, and a connection follows:

@@ -113,7 +113,6 @@ $ hydra -l 'developer' -p 'SummerVibes2024!' ssh://alpine.nyx
 [DATA] attacking ssh://alpine.nyx:22/
 [22][ssh] host: alpine.nyx   login: developer   password: SummerVibes2024!
 1 of 1 target successfully completed, 1 valid password found
-Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2026-07-22 04:58:
 ```
 
 The `developer` credentials check out, and a connection follows:

